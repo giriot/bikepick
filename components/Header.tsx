@@ -34,9 +34,6 @@ export function Header({ user }: { user: AppUser | null }) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-      <a href="#main" className="sr-focus absolute left-4 top-3 z-50 rounded-lg bg-ink px-3 py-2 text-sm text-white">
-        Skip to content
-      </a>
       <div className="container-xl">
         <div className="flex h-16 items-center gap-4">
           <Logo compact />

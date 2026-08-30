@@ -139,18 +139,38 @@ function toPg(sql: string): string {
   return out;
 }
 
+// Transient connection errors (cold-start TLS to the pooler, pooler idle
+// timeout killing a stale connection, brief DNS blips). Safe to retry once.
+const TRANSIENT_PG =
+  /ECONNRESET|ETIMEDOUT|EAI_AGAIN|EPIPE|timeout expired|Connection terminated|server closed the connection unexpectedly|connection was closed|terminating connection|no more connections|SSL connection has been closed|ConnectionRefused/i;
+
 function createPostgres(url: string): Driver {
   const { Pool } = require('pg');
   const pool = new Pool({
     connectionString: url,
     max: Number(process.env.PGPOOL_MAX || 8),
     ssl: url.includes('localhost') ? undefined : { rejectUnauthorized: false },
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 15000,
   });
   let txClient: any = null;
 
   const q = async (sql: string, params: Param[] = []) => {
-    const runner = txClient || pool;
-    return runner.query(toPg(sql), normalizeParams(params));
+    const pgSql = toPg(sql);
+    const paramsNorm = normalizeParams(params);
+    let attempt = 0;
+    for (;;) {
+      try {
+        const runner = txClient || pool;
+        return await runner.query(pgSql, paramsNorm);
+      } catch (e) {
+        // Never retry mid-transaction (state may be dirty).
+        if (txClient) throw e;
+        attempt++;
+        if (attempt >= 2 || !TRANSIENT_PG.test(String((e as any)?.message || e))) throw e;
+        await new Promise((r) => setTimeout(r, 150 * attempt));
+      }
+    }
   };
 
   return {
