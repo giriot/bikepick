@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CompareBike sitemap.
+  Static core URLs are listed here. Bike pages (/new-bikes/<brand>/<model>),
+  used-bike pages (/used-bikes/<id>) and guide pages are dynamic; add them to
+  this file (or generate it) when the catalogue is loaded. Keep <loc> values
+  pointing at the production domain after you deploy.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://YOUR-DOMAIN.example.com/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/new-bikes</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/upcoming-bikes</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/top-mileage-bikes</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/used-bikes</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/post-used-bike</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/compare</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/brands</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/guides</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/faq</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/about</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/contact</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/legal/privacy-policy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/legal/terms-of-service</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/legal/cookie-policy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/legal/disclaimer</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/legal/affiliate-disclosure</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/legal/refund-policy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/legal/shipping-policy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://YOUR-DOMAIN.example.com/legal/ip-policy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+</urlset>

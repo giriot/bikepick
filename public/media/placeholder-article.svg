@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" role="img" aria-label="Bikepick guide">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EEF6FF"/><stop offset="1" stop-color="#E6FAF4"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#g)"/>
+  <g fill="none" stroke="#0F62FE" stroke-opacity="0.18" stroke-width="2">
+    <circle cx="420" cy="430" r="86"/><circle cx="790" cy="430" r="86"/>
+    <path d="M420 430 L540 300 L700 300 L790 430"/><path d="M540 300 L620 430"/>
+  </g>
+  <text x="600" y="150" font-family="system-ui, sans-serif" font-size="42" font-weight="700" fill="#0B1B33" text-anchor="middle">Bikepick.IN</text>
+  <text x="600" y="196" font-family="system-ui, sans-serif" font-size="22" fill="#5A6B85" text-anchor="middle">Compare Smart. Buy Better.</text>
+</svg>

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500" role="img" aria-label="Scooter illustration placeholder">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/><stop offset="70%" stop-color="#F7F9FC"/><stop offset="100%" stop-color="#EDF1F7"/>
+    </linearGradient>
+    <radialGradient id="pad" cx="50%" cy="88%" r="42%">
+      <stop offset="0%" stop-color="#C9D3E0" stop-opacity=".55"/><stop offset="100%" stop-color="#C9D3E0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5B21B6"/><stop offset="100%" stop-color="#0B1220"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)"/>
+  <ellipse cx="400" cy="430" rx="290" ry="34" fill="url(#pad)"/>
+  
+  
+  <circle cx="220" cy="348" r="66" fill="#12161D"/>
+  <circle cx="220" cy="348" r="57" fill="#1D242E"/>
+  <circle cx="220" cy="348" r="40" fill="#C6CFDA"/>
+  <circle cx="220" cy="348" r="26" fill="#8D99A8"/>
+  <line x1="248" y1="348" x2="274" y2="348" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="242.65247584249852" y1="364.45798706418924" x2="263.6869176962472" y2="379.74040362379355" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="228.65247584249852" y1="374.6295824562643" x2="236.68691769624718" y2="399.3570518799383" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="211.34752415750148" y1="374.6295824562643" x2="203.31308230375285" y2="399.3570518799383" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="197.34752415750148" y1="364.45798706418924" x2="176.31308230375285" y2="379.74040362379355" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="192" y1="348" x2="166" y2="348" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="197.34752415750148" y1="331.54201293581076" x2="176.31308230375282" y2="316.25959637620645" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="211.34752415750148" y1="321.3704175437357" x2="203.31308230375282" y2="296.6429481200617" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="228.65247584249852" y1="321.3704175437357" x2="236.68691769624715" y2="296.6429481200617" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="242.65247584249852" y1="331.54201293581076" x2="263.6869176962472" y2="316.25959637620645" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/>
+  
+  <circle cx="596" cy="348" r="66" fill="#12161D"/>
+  <circle cx="596" cy="348" r="57" fill="#1D242E"/>
+  <circle cx="596" cy="348" r="40" fill="#C6CFDA"/>
+  <circle cx="596" cy="348" r="26" fill="#8D99A8"/>
+  <line x1="624" y1="348" x2="650" y2="348" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="618.6524758424986" y1="364.45798706418924" x2="639.6869176962472" y2="379.74040362379355" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="604.6524758424986" y1="374.6295824562643" x2="612.6869176962472" y2="399.3570518799383" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="587.3475241575014" y1="374.6295824562643" x2="579.3130823037528" y2="399.3570518799383" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="573.3475241575014" y1="364.45798706418924" x2="552.3130823037528" y2="379.74040362379355" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="568" y1="348" x2="542" y2="348" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="573.3475241575014" y1="331.54201293581076" x2="552.3130823037528" y2="316.25959637620645" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="587.3475241575014" y1="321.3704175437357" x2="579.3130823037528" y2="296.6429481200617" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="604.6524758424986" y1="321.3704175437357" x2="612.6869176962472" y2="296.6429481200617" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/><line x1="618.6524758424986" y1="331.54201293581076" x2="639.6869176962472" y2="316.25959637620645" stroke="#AFBAC7" stroke-width="5" stroke-linecap="round"/>
+  <path d="M262 352 L520 352 C560 352 566 330 560 312 L534 250 L470 250 L430 300 L300 300 Z" fill="url(#body)"/>
+  <path d="M300 300 C268 296 254 268 262 232 L300 200 L336 214 L318 300 Z" fill="#1B2430"/>
+  <path d="M296 206 L226 194" stroke="#39424F" stroke-width="12" stroke-linecap="round"/>
+  <ellipse cx="486" cy="248" rx="66" ry="16" fill="#0F1520"/>
+  <path d="M540 268 C580 268 606 296 606 320" stroke="#5A6675" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <circle cx="240" cy="222" r="16" fill="#F3F7FC" stroke="#39424F" stroke-width="4"/>
+  <rect x="292" y="180" width="60" height="12" rx="6" fill="#59647300"/>
+  <text x="400" y="478" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="15" fill="#8C96A6" letter-spacing=".18em">ILLUSTRATION · AWAITING LICENSED PHOTO</text>
+</svg>

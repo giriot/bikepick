@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+next-env.d.ts.bak
+
+# Local databases — never commit
+data/*.db
+data/*.db-*
+*.sqlite
+
+# Environment — never commit real keys
+.env
+.env.*
+!.env.example
+
+# Misc
+*.tsbuildinfo
+.DS_Store
+coverage/
+logs/
