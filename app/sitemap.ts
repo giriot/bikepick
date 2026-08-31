@@ -10,8 +10,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const statics = [
     '', '/bikes', '/electric', '/used-bikes', '/used-bikes/sell', '/compare', '/dealer-offers',
-    '/guides', '/reviews', '/find-my-bike', '/tools/ev-vs-petrol', '/tools/emi', '/tools/valuation',
-    '/service-centres', '/inspection', '/dealer/register', '/dealer/plans', '/business/bulk-enquiry',
+    '/guides', '/reviews', '/find-my-bike', '/tools/ev-vs-petrol', '/tools/emi', '/tools/used-bike-price',
+    '/service-centres', '/inspection', '/dealer/register', '/dealer/subscription', '/business/bulk-enquiry',
     '/legal/privacy', '/legal/terms', '/legal/cookies', '/legal/disclaimer', '/legal/affiliate-disclosure',
     '/legal/dealer-terms', '/legal/used-bike-terms', '/legal/verification-terms', '/contact',
   ].map((p) => ({

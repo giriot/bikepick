@@ -14,7 +14,7 @@ const COLUMNS = [
     title: 'Tools',
     links: [
       ['Find my bike', '/find-my-bike'], ['EV vs petrol calculator', '/tools/ev-vs-petrol'],
-      ['EMI calculator', '/tools/emi'], ['Used bike price estimator', '/tools/valuation'],
+      ['EMI calculator', '/tools/emi'], ['Used bike price estimator', '/tools/used-bike-price'],
       ['Find a service centre', '/service-centres'], ['Book an inspection', '/inspection'],
     ],
   },
@@ -22,7 +22,7 @@ const COLUMNS = [
     title: 'Sell & partner',
     links: [
       ['Sell your bike', '/used-bikes/sell'], ['Dealer registration', '/dealer/register'],
-      ['Dealer plans', '/dealer/plans'], ['Bulk / fleet enquiry', '/business/bulk-enquiry'],
+      ['Dealer plans', '/dealer/subscription'], ['Bulk / fleet enquiry', '/business/bulk-enquiry'],
       ['Advertise with us', '/contact'],
     ],
   },

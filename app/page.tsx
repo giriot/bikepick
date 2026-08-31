@@ -280,7 +280,7 @@ export default async function HomePage() {
           <p className="text-sm text-ink-mute">Looking for something else?</p>
           <ChangeCategoryButton />
           <Link href="/find-my-bike" className="chip">Find my bike</Link>
-          <Link href="/tools/valuation" className="chip">Value my used bike</Link>
+          <Link href="/tools/used-bike-price" className="chip">Value my used bike</Link>
           <Link href="/dealer/register" className="chip">Register as a dealer</Link>
         </div>
       </section>
