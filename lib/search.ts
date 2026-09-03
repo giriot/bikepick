@@ -89,7 +89,7 @@ export async function globalSearch(query: string, limitPerGroup = 6): Promise<Se
       subtitle: r.fuel_type === 'electric' ? 'Electric' : 'Petrol',
       url: `/${r.fuel_type === 'electric' ? 'electric' : 'bikes'}/${r.brand_slug}/${r.slug}`,
       image: r.image_url,
-      meta: r.price_min ? `₹${Math.round(r.price_min).toLocaleString('en-IN')} onwards` : null,
+      meta: r.price_min ? `₹${Math.round(r.price_min).toLocaleString('en-IN')} onwards, ex-showroom` : null,
       rank: rankProduct(r),
     }))
     .sort((a, b) => b.rank - a.rank);
@@ -117,7 +117,7 @@ export async function globalSearch(query: string, limitPerGroup = 6): Promise<Se
         subtitle: r.fuel_type === 'electric' ? 'Electric' : 'Petrol',
         url: `/${r.fuel_type === 'electric' ? 'electric' : 'bikes'}/${r.brand_slug}/${r.slug}`,
         image: r.image_url,
-        meta: r.price_min ? `₹${Math.round(r.price_min).toLocaleString('en-IN')} onwards` : null,
+        meta: r.price_min ? `₹${Math.round(r.price_min).toLocaleString('en-IN')} onwards, ex-showroom` : null,
         rank: 10 + Math.min(10, (r.score || 0) / 10), // below any literal match
       }))
       .sort((a, b) => b.rank - a.rank);

@@ -122,6 +122,7 @@ export default async function ComparePage({ searchParams }: { searchParams: { id
                 {entity.name}
               </Link>
               <p className="mt-1 text-[15px] font-bold">{inr(entity.price)}</p>
+              <p className="text-[10.5px] text-ink-mute">ex-showroom</p>
               <div className="mt-2 flex justify-center"><ScoreRing score={result.total} size={62} /></div>
               {winner.entity.id === entity.id && <span className="badge mt-2 bg-accent-soft text-accent-dark">Highest score</span>}
             </div>

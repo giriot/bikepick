@@ -45,6 +45,24 @@ export default async function AdminEdit({ params }: { params: { resource: string
 
   const title = isNew ? `New ${resource.label.toLowerCase()}` : String(row[resource.titleColumn] || resource.label);
 
+  // Public "View on site" URL. Products live at /{bikes|electric}/{brand}/{slug}
+  // (the brand slug + fuel type are required — the naive publicPath/{slug}
+  // produced /bikes/{slug}, which 404s), everything else is publicPath/{slug}.
+  let publicUrl: string | null = null;
+  if (!isNew && resource.publicPath) {
+    if (resource.key === 'products') {
+      if (row.slug) {
+        const brand = row.brand_id
+          ? await db.get<any>('SELECT slug FROM brands WHERE id = ?', [row.brand_id])
+          : null;
+        const base = row.fuel_type === 'electric' ? 'electric' : 'bikes';
+        publicUrl = brand?.slug ? `/${base}/${brand.slug}/${row.slug}` : null;
+      }
+    } else {
+      publicUrl = row.slug ? `${resource.publicPath}/${row.slug}` : resource.publicPath;
+    }
+  }
+
   // Photos for this model (products only) — rendered inline below the form.
   const productImages = !isNew && resource.key === 'products'
     ? await db.all<any>(
@@ -64,8 +82,8 @@ export default async function AdminEdit({ params }: { params: { resource: string
         title={title}
         subtitle={isNew ? resource.description : `ID ${params.id}`}
         action={
-          !isNew && resource.publicPath ? (
-            <Link href={row.slug ? `${resource.publicPath}/${row.slug}` : resource.publicPath} className="btn-outline btn-sm" target="_blank">
+          publicUrl ? (
+            <Link href={publicUrl} className="btn-outline btn-sm" target="_blank">
               View on site ↗
             </Link>
           ) : undefined

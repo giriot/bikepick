@@ -101,7 +101,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
       { name: 'brand_name', label: 'Brand' },
       { name: 'fuel_type', label: 'Fuel', type: 'badge' },
       { name: 'body_type', label: 'Body' },
-      { name: 'price_min', label: 'Price', type: 'money' },
+      { name: 'price_min', label: 'Ex-showroom price', type: 'money' },
       { name: 'score', label: 'Score', type: 'number' },
       STATUS_BADGE(),
       { name: 'is_demo', label: 'Demo', type: 'bool' },
