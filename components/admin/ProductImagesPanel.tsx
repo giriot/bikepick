@@ -13,6 +13,9 @@ type Img = {
 };
 
 const MAX = 10;
+// AI-generated illustrations per model. Kept low on purpose — AI image
+// generation is quota-heavy, so the admin flow caps it at 2 (was 10).
+const AI_MAX = 2;
 
 /**
  * Photos for one product — inline on the product edit page.
@@ -142,16 +145,16 @@ export function ProductImagesPanel({ productId, initial }: { productId: string; 
       {space > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-b border-line bg-violet-50/50 px-5 py-3">
           <p className="mr-1 text-[11.5px] leading-4 text-ink-mute">
-            <b>AI images:</b> generates original illustrations — one per variant colour, model name printed on each, clean studio background.
-            They are clearly labelled “AI illustration” (not OEM photos).
+            <b>AI images:</b> generates up to {AI_MAX} original illustrations — model name printed on each, clean studio background.
+            Clearly labelled “AI illustration” (not OEM photos). Kept to {AI_MAX} to save AI quota.
           </p>
           <button
             type="button"
             disabled={genBusy || busy}
-            onClick={() => generateImages(space)}
+            onClick={() => generateImages(Math.min(space, AI_MAX))}
             className="btn-outline btn-sm disabled:opacity-50"
           >
-            {genBusy ? `Generating… ${MAX - space} `: `Generate up to ${space} from variant colours`}
+            {genBusy ? 'Generating…' : `Generate ${Math.min(space, AI_MAX)} from variant colours`}
           </button>
           {!genBusy && (
             <button

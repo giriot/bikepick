@@ -13,6 +13,7 @@ export const runtime = 'nodejs';
 
 const MAX_IMAGES = 10;
 const PER_CALL = 1; // one generation per request so we stay under the serverless time limit
+const AI_IMAGE_LIMIT = 2; // AI illustrations per model — kept low to save AI quota
 
 /**
  * Generates ONE original AI illustration of the model in the next variant
@@ -30,10 +31,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const brandName = brand?.name || '';
 
     const existing = await db.all<any>(
-      'SELECT id, sort_order FROM product_images WHERE product_id = ? AND deleted_at IS NULL',
+      'SELECT id, sort_order, alt_text, source_name FROM product_images WHERE product_id = ? AND deleted_at IS NULL',
       [params.id],
     );
     if (existing.length >= MAX_IMAGES) return fail(`This model already has ${MAX_IMAGES} images (the maximum). Remove one first.`, 422);
+
+    // AI quota guard: at most AI_IMAGE_LIMIT AI illustrations per model.
+    const aiCount = existing.filter(
+      (r: any) => String(r.alt_text || '').includes('(AI illustration)') || String(r.source_name || '').startsWith('AI generated'),
+    ).length;
+    if (aiCount >= AI_IMAGE_LIMIT) {
+      return fail(
+        `This model already has ${AI_IMAGE_LIMIT} AI illustrations — the limit to save AI quota. Remove one first, or add manual photos instead (they don't count against the limit).`,
+        422,
+      );
+    }
 
     const body = await readJson(req).catch(() => ({}));
     const color: string | null = body.color
