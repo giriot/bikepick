@@ -31,7 +31,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...statics,
     ...products.map((p) => ({
-      url: `${base}/${p.fuel_type === 'electric' ? 'electric' : 'bikes'}/${p.brand_slug}/${p.slug}`,
+      url: `${base}/${p.fuel_type === 'electric' ? 'electric' : 'bikes'}/${encodeURIComponent(p.brand_slug)}/${encodeURIComponent(p.slug)}`,
       lastModified: new Date(p.updated_at), changeFrequency: 'weekly' as const, priority: 0.9,
     })),
     ...used.map((u) => ({ url: `${base}/used-bikes/${u.slug}`, lastModified: new Date(u.updated_at), changeFrequency: 'daily' as const, priority: 0.6 })),

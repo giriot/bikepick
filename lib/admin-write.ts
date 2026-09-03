@@ -51,9 +51,14 @@ export async function normalisePayload(resource: AdminResource, body: Record<str
     out[f.name] = v;
   }
 
-  // Auto-slug where the table has one and the user left it blank.
-  if (cols.has('slug') && !out.slug && out[resource.titleColumn]) {
-    out.slug = slugify(String(out[resource.titleColumn]));
+  // Slugs are URL segments — always normalise them. A slug typed with spaces
+  // or uppercase (e.g. "CB125 Hornet") would otherwise produce URLs whose %20
+  // is never decoded by the router, so the model page 404s. Generate from the
+  // title when left blank, and slugify whatever was provided either way.
+  if (cols.has('slug')) {
+    const raw = out.slug ? String(out.slug) : out[resource.titleColumn] ? String(out[resource.titleColumn]) : '';
+    const clean = slugify(raw);
+    if (raw && clean) out.slug = clean;
   }
   return { data: out, errors };
 }

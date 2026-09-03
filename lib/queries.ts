@@ -1,8 +1,18 @@
 import 'server-only';
 import { db } from './db';
+import { slugify } from './slug';
 import type { CompareEntity } from './compare';
 import { computeScore, DEFAULT_WEIGHTS, type ScoreWeights } from './score';
 import { getJsonSetting } from './settings';
+
+/** decodeURIComponent that never throws on a malformed or already-decoded string. */
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
 
 export interface ProductFilters {
   category?: string;
@@ -181,12 +191,22 @@ async function attachScores(items: ProductCard[]): Promise<void> {
 }
 
 export async function getProductBySlug(brandSlug: string, slug: string) {
+  // Next.js does NOT URL-decode dynamic route segments, so a slug that needs
+  // encoding (e.g. "hornet 180" arriving as "hornet%20180") would never
+  // match the stored value. Decode here, then also accept the slugified form
+  // so both the raw slug and a later-cleaned slug resolve to the same model.
+  const b = safeDecode(brandSlug);
+  const s = safeDecode(slug);
+  const s2 = slugify(s);
+  const slugCandidates = s2 && s2 !== s ? [s, s2] : [s];
+  const slugIn = slugCandidates.map(() => '?').join(', ');
+
   const product = await db.get<any>(
     `SELECT p.*, b.name AS brand_name, b.slug AS brand_slug, b.logo_url AS brand_logo,
             b.official_website, c.slug AS category_slug, c.name AS category_name
        FROM products p JOIN brands b ON b.id = p.brand_id JOIN categories c ON c.id = p.category_id
-      WHERE b.slug = ? AND p.slug = ? AND p.deleted_at IS NULL`,
-    [brandSlug, slug],
+      WHERE b.slug = ? AND p.slug IN (${slugIn}) AND p.deleted_at IS NULL`,
+    [b, ...slugCandidates],
   );
   if (!product) return null;
 
