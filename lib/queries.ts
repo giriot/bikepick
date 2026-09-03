@@ -1,6 +1,8 @@
 import 'server-only';
 import { db } from './db';
 import type { CompareEntity } from './compare';
+import { computeScore, DEFAULT_WEIGHTS, type ScoreWeights } from './score';
+import { getJsonSetting } from './settings';
 
 export interface ProductFilters {
   category?: string;
@@ -14,7 +16,7 @@ export interface ProductFilters {
   abs?: boolean;
   bodyType?: string;
   q?: string;
-  sort?: 'popular' | 'price_low' | 'price_high' | 'score' | 'newest' | 'mileage';
+  sort?: 'popular' | 'price_low' | 'price_high' | 'score' | 'newest' | 'mileage' | 'range';
   page?: number;
   perPage?: number;
 }
@@ -45,11 +47,23 @@ const CARD_SELECT = `
     LEFT JOIN bike_specs bs ON bs.product_id = p.id AND bs.variant_id IS NULL
     LEFT JOIN ev_specs es ON es.product_id = p.id AND es.variant_id IS NULL`;
 
+/** 'bikes' / 'electric' are the site's fuel groups; the database stores
+    finer-grained categories (motorcycle, scooter, electric-*). Map them. */
+export function categoryClause(slug: string): { sql: string; params: string[] } {
+  if (slug === 'bikes') return { sql: "c.slug IN ('motorcycle','scooter')", params: [] };
+  if (slug === 'electric') return { sql: "c.slug IN ('electric-scooter','electric-motorcycle')", params: [] };
+  return { sql: 'c.slug = ?', params: [slug] };
+}
+
 export async function listProducts(f: ProductFilters = {}): Promise<{ items: ProductCard[]; total: number; page: number; pages: number }> {
   const where: string[] = ["p.status = 'published'", 'p.deleted_at IS NULL'];
   const params: any[] = [];
 
-  if (f.category) { where.push('c.slug = ?'); params.push(f.category); }
+  if (f.category) {
+    const cc = categoryClause(f.category);
+    where.push(cc.sql);
+    params.push(...cc.params);
+  }
   if (f.fuel) { where.push('p.fuel_type = ?'); params.push(f.fuel); }
   if (f.bodyType) { where.push('p.body_type = ?'); params.push(f.bodyType); }
   if (f.brand) {
@@ -77,6 +91,7 @@ export async function listProducts(f: ProductFilters = {}): Promise<{ items: Pro
     score: 'p.score DESC',
     newest: 'p.model_year DESC, p.created_at DESC',
     mileage: 'bs.mileage_kmpl DESC',
+    range: 'COALESCE(es.claimed_range_km, es.real_world_range_km) DESC, p.score DESC',
   };
   const orderBy = sortMap[f.sort || 'popular'] || sortMap.popular;
 
@@ -93,12 +108,76 @@ export async function listProducts(f: ProductFilters = {}): Promise<{ items: Pro
   );
   const total = Number(countRow?.n || 0);
 
-  const items = await db.all<ProductCard>(
+  let items = await db.all<ProductCard>(
     `${CARD_SELECT} ${whereSql} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
     [...params, perPage, (page - 1) * perPage],
   );
 
+  // The Bikepick Score is not a stored column — compute it live, exactly like
+  // the model page (lib/score with the admin weights + segment median price).
+  // For the "Bikepick Score" sort we rank ALL matching products, then page in JS
+  // (the catalogue is small; the products.score column is never populated).
+  if (f.sort === 'score') {
+    const all = await db.all<ProductCard>(
+      `${CARD_SELECT} ${whereSql} ORDER BY p.created_at DESC LIMIT 500`,
+      params,
+    );
+    await attachScores(all);
+    all.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+    items = all.slice((page - 1) * perPage, page * perPage);
+  } else {
+    await attachScores(items);
+  }
+
   return { items, total, page, pages: Math.max(1, Math.ceil(total / perPage)) };
+}
+
+/** Fill item.score with a live computeScore() pass — same inputs the model
+ *  page uses: base spec rows, admin-configured weights, and the MEDIAN
+ *  price of the product's own category (the value-for-money pillar is
+ *  segment-relative, so the card must match the model page exactly). */
+async function attachScores(items: ProductCard[]): Promise<void> {
+  if (!items.length) return;
+  const ids = items.map((i) => i.id);
+  const [weights, medRows, bsRows, esRows] = await Promise.all([
+    getJsonSetting<ScoreWeights>('score_weights', DEFAULT_WEIGHTS),
+    db.all<any>(
+      `SELECT c.slug, p.price_min FROM products p JOIN categories c ON c.id = p.category_id
+        WHERE p.status='published' AND p.price_min IS NOT NULL`,
+    ),
+    db.all<any>(`SELECT * FROM bike_specs WHERE product_id IN (${ids.map(() => '?').join(',')}) AND variant_id IS NULL`, ids),
+    db.all<any>(`SELECT * FROM ev_specs WHERE product_id IN (${ids.map(() => '?').join(',')}) AND variant_id IS NULL`, ids),
+  ]);
+  // Median per category — same definition as the model page (COUNT(*)/2 offset
+  // on the ordered price list = element at index floor(N/2)).
+  const byCat: Record<string, number[]> = {};
+  for (const r of medRows) {
+    const n = Number(r.price_min);
+    if (Number.isFinite(n)) (byCat[r.slug] ||= []).push(n);
+  }
+  const medianByCat: Record<string, number | null> = {};
+  for (const [slug, arr] of Object.entries(byCat)) {
+    arr.sort((a, b) => a - b);
+    medianByCat[slug] = arr.length ? arr[Math.floor(arr.length / 2)] : null;
+  }
+  const bsMap: Record<string, any> = {};
+  for (const r of bsRows) bsMap[r.product_id] = r;
+  const esMap: Record<string, any> = {};
+  for (const r of esRows) esMap[r.product_id] = r;
+  for (const item of items) {
+    if (item.price_min == null) continue;
+    const s = computeScore(
+      {
+        price: item.price_min,
+        fuelType: item.fuel_type,
+        bike: bsMap[item.id] || null,
+        ev: esMap[item.id] || null,
+        segment: { medianPrice: medianByCat[item.category_slug] ?? null },
+      },
+      weights,
+    );
+    item.score = s.total;
+  }
 }
 
 export async function getProductBySlug(brandSlug: string, slug: string) {

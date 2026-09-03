@@ -41,3 +41,19 @@ export function relative(value: string | null | undefined): string {
 export function titleCase(s: string): string {
   return s.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+/** Parse a stored text field into a clean string array.
+ *  Handles: real JSON arrays, JSON strings, the literal 'null' (form bug), and plain newline text. */
+export function toStrArray(v: unknown): string[] {
+  if (v == null || v === '') return [];
+  if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean);
+  const s = String(v).trim();
+  if (s === 'null' || s === 'NULL' || s === 'undefined') return [];
+  if (s.startsWith('[')) {
+    try {
+      const p = JSON.parse(s);
+      return Array.isArray(p) ? p.map((x) => String(x).trim()).filter(Boolean) : [];
+    } catch { /* fall through to line-split */ }
+  }
+  return s.split('\n').map((x) => x.trim().replace(/^[-•*]\s*/, '')).filter(Boolean);
+}

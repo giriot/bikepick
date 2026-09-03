@@ -9,6 +9,8 @@ import { relative } from '@/lib/format';
 import { AdminHeader, Badge } from '@/components/admin/ui';
 import { ResourceForm } from '@/components/admin/ResourceForm';
 import { RowActions } from '@/components/admin/RowActions';
+import { ProductImagesPanel } from '@/components/admin/ProductImagesPanel';
+import { BrandLogoPanel } from '@/components/admin/BrandLogoPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +45,15 @@ export default async function AdminEdit({ params }: { params: { resource: string
 
   const title = isNew ? `New ${resource.label.toLowerCase()}` : String(row[resource.titleColumn] || resource.label);
 
+  // Photos for this model (products only) — rendered inline below the form.
+  const productImages = !isNew && resource.key === 'products'
+    ? await db.all<any>(
+        'SELECT id, image_url, thumbnail_url, alt_text, license_status, sort_order, approved, is_primary, created_at ' +
+        'FROM product_images WHERE product_id = ? AND deleted_at IS NULL ORDER BY is_primary DESC, sort_order, created_at',
+        [params.id],
+      )
+    : [];
+
   return (
     <div>
       <div className="mb-3">
@@ -63,6 +74,37 @@ export default async function AdminEdit({ params }: { params: { resource: string
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <div>
+          {resource.key === 'brands' && !isNew && (
+            <BrandLogoPanel
+              brandId={params.id}
+              initial={{
+                logo_url: (row.logo_url as string | null) || null,
+                logo_source: (row.logo_source as string | null) || null,
+                logo_license: (row.logo_license as string | null) || null,
+              }}
+            />
+          )}
+          {resource.key === 'products' && !isNew && (
+            <div className="mb-4 rounded-xl border border-brand-200 bg-brand-50 p-4">
+              <p className="text-[13.5px] font-semibold text-brand-800">Basics for a complete model page</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <a href="#photos" className="flex items-center gap-3 rounded-lg border border-brand-200 bg-white p-3 hover:border-brand-400">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-100 text-[13px] font-bold text-brand-700">1</span>
+                  <span>
+                    <span className="block text-[13px] font-semibold">Photos — add up to 5</span>
+                    <span className="block text-[11.5px] leading-4 text-ink-mute">Right below this form: click “+ Add photo”.</span>
+                  </span>
+                </a>
+                <Link href={`/admin/products/${params.id}/specs`} className="flex items-center gap-3 rounded-lg border border-brand-200 bg-white p-3 hover:border-brand-400">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-100 text-[13px] font-bold text-brand-700">2</span>
+                  <span>
+                    <span className="block text-[13px] font-semibold">Specification sheet (dropdowns)</span>
+                    <span className="block text-[11.5px] leading-4 text-ink-mute">Engine, brakes, dimensions, features, colours, warranty →</span>
+                  </span>
+                </Link>
+              </div>
+            </div>
+          )}
           {resource.fields.length === 0 ? (
             <div className="rounded-xl border border-line bg-white p-5">
               <p className="text-[13px] text-ink-mute">This record is read-only by design.</p>
@@ -79,6 +121,12 @@ export default async function AdminEdit({ params }: { params: { resource: string
             <ResourceForm resource={resource.key} id={isNew ? undefined : params.id}
               fields={resource.fields} initial={row} relations={relations} canDelete={resource.canDelete} />
           )}
+
+          {resource.key === 'products' && !isNew && (
+            <div className="mt-5">
+              <ProductImagesPanel productId={params.id} initial={productImages} />
+            </div>
+          )}
         </div>
 
         {!isNew && (
@@ -90,7 +138,7 @@ export default async function AdminEdit({ params }: { params: { resource: string
                   Actions here notify the person affected and are written to the audit log.
                 </p>
                 <div className="mt-3">
-                  <RowActions resource={resource.key} id={params.id} row={row} actions={resource.actions || []} />
+                  <RowActions resource={resource.key} id={params.id} row={row} actions={resource.actions || []} canDelete={resource.canDelete} />
                 </div>
               </div>
             )}

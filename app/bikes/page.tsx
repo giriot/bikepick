@@ -3,6 +3,7 @@ import { ProductListing } from '@/components/ProductListing';
 import { buildMetadata, breadcrumbJsonLd, JsonLd } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export const metadata = buildMetadata({
   title: 'New Bikes & Scooters in India — Prices, Specs and Comparison',

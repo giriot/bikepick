@@ -39,6 +39,22 @@ export default async function DealerOffers() {
   const live = offers.filter((o) => ['pending', 'approved'].includes(o.status)).length;
   const limit = sub?.offer_limit ?? 3;
 
+  // Location list for the offer form: every city Bikepick already serves
+  // (dealers, offers, service centres) + the dealer's own city.
+  const [dealerCities, offerCities, scCities] = await Promise.all([
+    db.all<any>("SELECT DISTINCT city FROM dealer_profiles WHERE city IS NOT NULL AND city != '' AND deleted_at IS NULL"),
+    db.all<any>("SELECT DISTINCT city FROM dealer_offers WHERE city IS NOT NULL AND city != '' AND deleted_at IS NULL"),
+    db.all<any>("SELECT DISTINCT city FROM service_centres WHERE city IS NOT NULL AND city != '' AND deleted_at IS NULL"),
+  ]);
+  const cities = Array.from(
+    new Set(
+      [dealer.city, ...dealerCities, ...offerCities, ...scCities]
+        .map((r: any) => (typeof r === 'string' ? r : r.city))
+        .map((c: any) => String(c || '').trim())
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -47,7 +63,11 @@ export default async function DealerOffers() {
           <p className="text-[12.5px] text-ink-mute">{live} of {limit} live offer slots used on your current plan.</p>
         </div>
         {live < limit
-          ? <OfferForm products={products.map((p) => ({ id: p.id, label: `${p.brand_name} ${p.name}`, price: p.price_min }))} city={dealer.city} />
+          ? <OfferForm
+              products={products.map((p) => ({ id: p.id, label: `${p.brand_name} ${p.name}`, price: p.price_min }))}
+              city={dealer.city}
+              cities={cities}
+            />
           : <span className="text-[12.5px] text-ink-mute">Slot limit reached — withdraw one or upgrade.</span>}
       </div>
 

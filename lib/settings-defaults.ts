@@ -7,7 +7,14 @@ export const DEFAULT_SETTINGS: Record<string, { value: string; type: string; gro
   site_logo_text: { value: 'bikepick', type: 'string', group: 'brand', label: 'Logo wordmark' },
   brand_color: { value: '#F0620C', type: 'string', group: 'brand', label: 'Primary colour' },
   accent_color: { value: '#00B27A', type: 'string', group: 'brand', label: 'Accent colour' },
-  contact_email: { value: 'hello@bikepick.in', type: 'string', group: 'general', label: 'Contact email' },
+  contact_email: { value: 'bikepick@outlook.com', type: 'string', group: 'general', label: 'Contact email' },
+  owner_email: {
+    value: 'bikepick@outlook.com',
+    type: 'string',
+    group: 'notifications',
+    label: 'Owner email — receives a copy of every site event (dealer applications, new listings, leads, contact messages)',
+    help: 'Every site event is emailed here in addition to in-app notifications.',
+  },
   grievance_officer: { value: 'Grievance Officer, Bikepick.IN', type: 'string', group: 'general', label: 'Grievance officer' },
   show_category_chooser: { value: '1', type: 'bool', group: 'homepage', label: 'Show first-visit category chooser' },
   homepage_sections: {

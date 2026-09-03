@@ -1,23 +1,28 @@
-# Dependencies
+# dependencies
 node_modules/
 
-# Next.js
+# next.js build output
 .next/
 out/
-next-env.d.ts.bak
 
-# Local databases — never commit
-data/*.db
-data/*.db-*
-*.sqlite
-
-# Environment — never commit real keys
+# environment (never commit real values)
 .env
 .env.*
 !.env.example
 
-# Misc
-*.tsbuildinfo
+# local SQLite databases
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# misc
+tsconfig.tsbuildinfo
+*.log
 .DS_Store
+.vercel
+.env*
+
+# test coverage & logs
 coverage/
 logs/

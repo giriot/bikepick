@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+.env
+.env.*
+!.env.example
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+tsconfig.tsbuildinfo
+*.log
+.DS_Store
+.git
+.gitignore

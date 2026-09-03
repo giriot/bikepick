@@ -9,9 +9,11 @@ import { inr } from '@/lib/format';
 import { buildMetadata, breadcrumbJsonLd, JsonLd } from '@/lib/seo';
 import { Breadcrumbs, Empty, Notice, ScoreRing, SectionHeader } from '@/components/ui';
 import { CompareToggle } from '@/components/CompareToggle';
+import { QuickCompare } from '@/components/QuickCompare';
 import { AdSlot } from '@/components/AdSlot';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export const metadata = buildMetadata({
   title: 'Compare Bikes & Electric Scooters Side by Side',
@@ -24,6 +26,11 @@ export default async function ComparePage({ searchParams }: { searchParams: { id
   const ids = (searchParams.ids || '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 4);
   const entities = ids.length ? await getCompareEntities(ids) : [];
   const weights = await getJsonSetting<ScoreWeights>('score_weights', DEFAULT_WEIGHTS);
+  const picker = (await listProducts({ sort: 'popular', perPage: 40 })).items.map((p) => ({
+    id: p.id,
+    label: `${p.brand_name} ${p.name}`,
+    price: p.price_min,
+  }));
 
   const crumbs = [{ name: 'Home', url: '/' }, { name: 'Compare', url: '/compare' }];
 
@@ -45,6 +52,8 @@ export default async function ComparePage({ searchParams }: { searchParams: { id
         {entities.length === 1 && (
           <div className="mt-5"><Notice tone="info">Add at least one more model to start the comparison.</Notice></div>
         )}
+
+        <div className="mt-6"><QuickCompare products={picker} /></div>
 
         <section className="mt-8">
           <SectionHeader title="Popular comparisons" subtitle="Ready-made comparisons from our editorial team." />
@@ -96,6 +105,8 @@ export default async function ComparePage({ searchParams }: { searchParams: { id
       <p className="mt-1.5 text-sm text-ink-mute">
         {groups.reduce((a, g) => a + g.rows.length, 0)} attributes compared · best value highlighted in green, weakest in amber.
       </p>
+
+      <div className="mt-5"><QuickCompare products={picker} /></div>
 
       {/* Header cards */}
       <div className="mt-6 overflow-x-auto">

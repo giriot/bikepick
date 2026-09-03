@@ -11,7 +11,7 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [{ protocol: 'https', hostname: '**' }],
   },
-  experimental: { serverComponentsExternalPackages: ['better-sqlite3', 'pg'] },
+  experimental: { serverComponentsExternalPackages: ['better-sqlite3', 'pg', '@resvg/resvg-js'] },
   async headers() {
     return [
       {

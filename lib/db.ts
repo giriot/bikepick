@@ -140,9 +140,9 @@ function toPg(sql: string): string {
 }
 
 // Transient connection errors (cold-start TLS to the pooler, pooler idle
-// timeout killing a stale connection, brief DNS blips). Safe to retry once.
+// timeout killing a stale connection, brief DNS blips). Safe to retry.
 const TRANSIENT_PG =
-  /ECONNRESET|ETIMEDOUT|EAI_AGAIN|EPIPE|timeout expired|Connection terminated|server closed the connection unexpectedly|connection was closed|terminating connection|no more connections|SSL connection has been closed|ConnectionRefused/i;
+  /ECONNRESET|ECONNREFUSED|ECONNABORTED|EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|EAI_AGAIN|EPIPE|timeout expired|Connection terminated|server closed the connection unexpectedly|connection was closed|terminating connection|no more connections|SSL connection has been closed|ConnectionRefused/i;
 
 function createPostgres(url: string): Driver {
   const { Pool } = require('pg');
@@ -151,9 +151,18 @@ function createPostgres(url: string): Driver {
     max: Number(process.env.PGPOOL_MAX || 8),
     ssl: url.includes('localhost') ? undefined : { rejectUnauthorized: false },
     connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 15000,
+    // Keep pooled connections alive across the 5-minute keep-warm cron
+    // pings so page loads never pay the pooler TLS handshake (1–3 s) right
+    // after an idle gap. pgbouncer recycles backend sessions on its own.
+    idleTimeoutMillis: 3600000,
   });
+  // Warm the connection on first use so the very first query of a cold
+  // function instance overlaps the TLS handshake instead of being cut off
+  // by the platform timeout while it waits for one.
+  pool.query('SELECT 1').catch(() => { /* retried by the query path below */ });
   let txClient: any = null;
+
+  const RETRY_DELAYS = [300, 800, 1800];
 
   const q = async (sql: string, params: Param[] = []) => {
     const pgSql = toPg(sql);
@@ -167,8 +176,8 @@ function createPostgres(url: string): Driver {
         // Never retry mid-transaction (state may be dirty).
         if (txClient) throw e;
         attempt++;
-        if (attempt >= 2 || !TRANSIENT_PG.test(String((e as any)?.message || e))) throw e;
-        await new Promise((r) => setTimeout(r, 150 * attempt));
+        if (attempt > RETRY_DELAYS.length || !TRANSIENT_PG.test(String((e as any)?.message || e))) throw e;
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt - 1]));
       }
     }
   };

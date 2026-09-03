@@ -20,7 +20,8 @@ export function generateMetadata({ searchParams }: { searchParams: { q?: string 
 
 export default async function SearchPage({ searchParams }: { searchParams: { q?: string } }) {
   const q = (searchParams.q || '').trim();
-  const groups = q ? await globalSearch(q, 8) : [];
+  const result = q ? await globalSearch(q, 8) : { groups: [], didYouMean: null as string | null };
+  const groups = result.groups;
   const total = groups.reduce((a, g) => a + g.hits.length, 0);
 
   // Recording what people search for (and what returned nothing) is how the owner
@@ -34,6 +35,16 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
         {q ? <>Results for “{q}”</> : 'Search'}
       </h1>
       <div className="mt-4 max-w-2xl"><SearchBox size="lg" autoFocus={!q} /></div>
+
+      {result.didYouMean && (
+        <p className="mt-3 text-sm text-ink-soft">
+          Did you mean{' '}
+          <Link href={`/search?q=${encodeURIComponent(result.didYouMean)}`} className="font-semibold text-brand-600 hover:underline">
+            {result.didYouMean}
+          </Link>
+          ?
+        </p>
+      )}
 
       {q && total === 0 && (
         <div className="mt-8">

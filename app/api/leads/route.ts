@@ -101,6 +101,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    let dealerNotified = false;
     if (dealerId) {
       const dealer = await db.get<any>('SELECT user_id, email, phone, business_name FROM dealer_profiles WHERE id = ?', [dealerId]);
       if (dealer) {
@@ -110,7 +111,23 @@ export async function POST(req: NextRequest) {
           body: `${body.name} (${body.phone})${body.city ? ` from ${body.city}` : ''} submitted an enquiry.`,
           link: '/dealer/leads', email: dealer.email, phone: dealer.phone,
         });
+        dealerNotified = true;
       }
+    }
+
+    // Unrouted enquiries (e.g. contact-page messages) still create a
+    // notification so the owner copy fan-out in notify() emails the site
+    // owner — every message sent through the website reaches them.
+    if (!dealerNotified) {
+      await notify({
+        userId: user?.id || null, event: 'new_lead',
+        title: `New ${body.lead_type.replace(/_/g, ' ')} enquiry`,
+        body: [
+          `${body.name} · ${body.phone}${body.city ? ` · ${body.city}` : ''}${body.email ? ` · ${body.email}` : ''}`,
+          (body as any).message ? `Message: ${(body as any).message}` : null,
+        ].filter(Boolean).join('\n'),
+        link: '/admin/leads', email: body.email || null, phone: body.phone,
+      });
     }
 
     await track('lead_created', { entity_type: 'lead', entity_id: leadId, user_id: user?.id, meta: { type: body.lead_type } });

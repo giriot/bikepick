@@ -433,6 +433,30 @@ textarea {
   border-color: var(--brand);
   box-shadow: 0 0 0 3px var(--brand-tint);
 }
+/* Admin forms (ResourceForm) put the "field" class directly on the control
+   itself, so style that pattern too — with a clearly visible border. */
+input.field,
+select.field,
+textarea.field {
+  width: 100%;
+  border: 1px solid #c3cad4;
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+  outline: none;
+  color: var(--ink);
+  background: #fff;
+}
+input.field:hover,
+select.field:hover,
+textarea.field:hover {
+  border-color: #9aa4b2;
+}
+input.field:focus,
+select.field:focus,
+textarea.field:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-tint);
+}
 .login-error {
   background: var(--brand-tint);
   border: 1px solid #f6d2d2;

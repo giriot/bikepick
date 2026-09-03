@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
-import { db, nowIso } from '@/lib/db';
+import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/rbac';
+import { setSetting, DEFAULT_SETTINGS } from '@/lib/settings';
 import { handleError, ok, fail, readJson } from '@/lib/api';
 import { audit } from '@/lib/audit';
 
@@ -13,16 +14,19 @@ export async function PATCH(req: NextRequest) {
 
     const existing = await db.all<any>('SELECT key, value, value_type FROM settings');
     const byKey = new Map(existing.map((s) => [s.key, s]));
+    const defaults = DEFAULT_SETTINGS as Record<string, { value: string; type: string }>;
     const changed: Record<string, { from: string; to: string }> = {};
     const errors: Record<string, string> = {};
 
     for (const [key, raw] of Object.entries(body.values)) {
       const row = byKey.get(key);
-      if (!row) continue;
+      const def = defaults[key];
+      if (!row && !def) continue; // unknown key — never write garbage into settings
       const value = String(raw ?? '').trim();
+      const type = row?.value_type || def?.type || 'string';
 
-      if (row.value_type === 'number' && value !== '' && Number.isNaN(Number(value))) { errors[key] = 'Must be a number'; continue; }
-      if (row.value_type === 'json' && value !== '') {
+      if (type === 'number' && value !== '' && Number.isNaN(Number(value))) { errors[key] = 'Must be a number'; continue; }
+      if (type === 'json' && value !== '') {
         try { JSON.parse(value); } catch { errors[key] = 'Must be valid JSON'; continue; }
       }
       if (key === 'score_weights') {
@@ -32,9 +36,10 @@ export async function PATCH(req: NextRequest) {
           if (total <= 0) { errors[key] = 'Weights must total more than zero'; continue; }
         } catch { errors[key] = 'Must be valid JSON'; continue; }
       }
-      if (value === row.value) continue;
-      changed[key] = { from: row.value, to: value };
-      await db.run('UPDATE settings SET value = ?, updated_at = ? WHERE key = ?', [value, nowIso(), key]);
+      const current = row?.value ?? def?.value ?? '';
+      if (value === current) continue;
+      changed[key] = { from: current, to: value };
+      await setSetting(key, value); // upsert — creates the row if the key predates it in this DB
     }
 
     if (Object.keys(errors).length) return fail('Some settings were not saved', 422, errors);

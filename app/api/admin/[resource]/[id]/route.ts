@@ -19,6 +19,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { resource: 
     const { data, errors } = await normalisePayload(resource, body);
     if (Object.keys(errors).length) return fail('Please correct the highlighted fields', 422, errors);
 
+    // pros/cons/best_for are intentionally NOT part of the product form (the
+    // boxes were removed from the UI), but the AI template panel saves them —
+    // accept them explicitly here so that save is real, not a silent no-op.
+    if (resource.key === 'products') {
+      for (const k of ['pros', 'cons', 'best_for']) {
+        if (k in body) data[k] = body[k] === null || body[k] === '' ? null : String(body[k]);
+      }
+    }
+
     // Record only what actually changed, for a meaningful audit trail.
     const changed: Record<string, any> = {};
     for (const [k, v] of Object.entries(data)) {

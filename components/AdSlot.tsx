@@ -17,7 +17,8 @@ export async function AdSlot({ slotKey, className = '' }: { slotKey: string; cla
   if (!client) return null;
 
   const slot = await db.get<any>('SELECT * FROM ad_slots WHERE slot_key = ? AND enabled = 1', [slotKey]);
-  if (!slot) return null;
+  // No unit ID pasted yet (Admin → Ad slots) -> nothing renders; no broken empty units.
+  if (!slot || !slot.ad_unit_id) return null;
 
   const visibility = [slot.show_desktop ? '' : 'lg:hidden', slot.show_mobile ? '' : 'hidden lg:block'].join(' ');
 

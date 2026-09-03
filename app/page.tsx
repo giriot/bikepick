@@ -11,6 +11,7 @@ import { SectionHeader, TrustBadge } from '@/components/ui';
 import { AdSlot } from '@/components/AdSlot';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export default async function HomePage() {
   const settings = await getSettings();
@@ -73,22 +74,18 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Three category cards */}
-          <div className="mt-12 grid gap-4 md:grid-cols-3">
+          {/* Two category cards (Used Bikes card removed per user request;
+              AI-generated studio photos instead of the old line-art SVGs) */}
+          <div className="mt-12 grid gap-4 md:grid-cols-2">
             <CategoryCard
               href="/bikes" title="Bikes & Scooters"
               body="Petrol motorcycles and scooters with full specification sheets, pros and cons, and dealer offers."
-              cta={`${stats.bikes - stats.evs} models`} art="/media/street.svg" tone="brand"
+              cta={`${stats.bikes - stats.evs} models`} art="/media/cat-bikes.jpg" tone="brand" cover
             />
             <CategoryCard
               href="/electric" title="Electric"
               body="EV scooters and motorcycles with claimed range, our own real-world estimate and charging detail."
-              cta={`${stats.evs} EVs`} art="/media/ev-scooter.svg" tone="accent"
-            />
-            <CategoryCard
-              href="/used-bikes" title="Used Bikes"
-              body="Verified used listings with a trust score built only from checks we actually performed."
-              cta={`${stats.used} listings`} art="/media/used.svg" tone="ink"
+              cta={`${stats.evs} EVs`} art="/media/cat-electric.jpg" tone="accent" cover
             />
           </div>
         </div>
@@ -288,13 +285,16 @@ export default async function HomePage() {
   );
 }
 
-function CategoryCard({ href, title, body, cta, art, tone }: { href: string; title: string; body: string; cta: string; art: string; tone: 'brand' | 'accent' | 'ink' }) {
+function CategoryCard({ href, title, body, cta, art, tone, cover }: { href: string; title: string; body: string; cta: string; art: string; tone: 'brand' | 'accent' | 'ink'; cover?: boolean }) {
   const ring = { brand: 'hover:border-brand-300', accent: 'hover:border-accent/40', ink: 'hover:border-ink/25' }[tone];
   const pill = { brand: 'bg-brand-50 text-brand-700', accent: 'bg-accent-soft text-accent-dark', ink: 'bg-surface text-ink-soft' }[tone];
   return (
     <Link href={href} className={`card card-hover group overflow-hidden ${ring}`}>
       <div className="product-stage h-36">
-        <Image src={art} alt="" width={420} height={260} className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-[1.04]" />
+        <Image
+          src={art} alt="" width={640} height={400}
+          className={`h-full w-full transition-transform duration-300 group-hover:scale-[1.04] ${cover ? 'object-cover' : 'object-contain p-2'}`}
+        />
       </div>
       <div className="p-5">
         <div className="flex items-center justify-between gap-2">

@@ -60,4 +60,49 @@ export async function notify(input: NotifyInput): Promise<void> {
       delivery_status: res.delivered ? 'sent' : res.reason || 'skipped',
     });
   }
+
+  // Owner copy: the site owner receives every site event by email (new dealer
+  // applications, new listings, new leads, contact messages…) so nothing
+  // waiting for a decision is missed. Independent of the user-facing
+  // notifications_email_enabled switch — that one only controls buyer/seller
+  // notification emails.
+  const owner = settings.owner_email;
+  if (owner && owner.toLowerCase() !== (input.email || '').toLowerCase()) {
+    const ownerMsg = {
+      to: owner,
+      subject: `[Bikepick.IN] ${input.title}`,
+      text: [
+        input.body || '',
+        '',
+        `Event: ${input.event}`,
+        `From: ${input.email || 'guest'}`,
+        input.phone ? `Phone: ${input.phone}` : null,
+        input.link ? `Link: https://bikepick.in${input.link}` : null,
+      ].filter(Boolean).join('\n'),
+    };
+    let ores = await emailService.send(ownerMsg);
+    if (!ores.delivered && ores.reason === 'not_configured') {
+      // Fallback until SMTP is configured: forward through FormSubmit (free,
+      // zero keys). Fire-and-forget — never blocks or fails the request.
+      try {
+        await fetch('https://formsubmit.co/ajax/bikepick@outlook.com', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({
+            _subject: ownerMsg.subject,
+            message: ownerMsg.text,
+            from: 'Bikepick.IN website notification',
+          }),
+        });
+        ores = { delivered: true, provider: 'formsubmit' };
+      } catch {
+        ores = { delivered: false, provider: 'formsubmit', reason: 'formsubmit_error' };
+      }
+    }
+    await insert('notifications', {
+      id: uid('ntf'), user_id: input.userId, channel: 'email', event_type: `${input.event}_owner_copy`,
+      title: ownerMsg.subject, body: ownerMsg.text, link: input.link || null,
+      delivery_status: ores.delivered ? 'sent' : ores.reason || 'skipped',
+    });
+  }
 }

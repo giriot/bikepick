@@ -15,16 +15,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!isStaff(user)) redirect('/account');
 
   // Pending-work counters shown as badges in the sidebar.
-  const [usedPending, dealerPending, offerPending, reviewPending, changePending] = await Promise.all([
+  const [usedPending, dealerPending, offerPending, reviewPending, changePending, specPending] = await Promise.all([
     db.get<any>("SELECT COUNT(*) AS c FROM used_bikes WHERE status IN ('submitted','verification_required','under_review') AND deleted_at IS NULL"),
     db.get<any>("SELECT COUNT(*) AS c FROM dealer_profiles WHERE status='pending' AND deleted_at IS NULL"),
     db.get<any>("SELECT COUNT(*) AS c FROM dealer_offers WHERE status='pending' AND deleted_at IS NULL"),
     db.get<any>("SELECT COUNT(*) AS c FROM reviews WHERE status='pending' AND deleted_at IS NULL"),
     db.get<any>("SELECT COUNT(*) AS c FROM data_change_logs WHERE status='pending'"),
+    // Newer table — tolerate not-existing yet (fresh deploys before setup).
+    db.get<any>("SELECT COUNT(*) AS c FROM spec_suggestions WHERE status='pending'").catch(() => undefined),
   ]);
   const badges: Record<string, number> = {
     'used-bikes': usedPending?.c || 0, dealers: dealerPending?.c || 0,
     offers: offerPending?.c || 0, reviews: reviewPending?.c || 0, changes: changePending?.c || 0,
+    'spec-suggestions': specPending?.c || 0,
   };
 
   const allowed = ADMIN_RESOURCES.filter((r) => r.permission === '*' ? can(user, '*') : can(user, r.permission));
@@ -45,6 +48,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   if (can(user, '*')) {
     groups.push({ group: 'System', items: [
+      { href: '/admin/spec-suggestions', label: 'Spec suggestions', badge: badges['spec-suggestions'] || undefined },
       { href: '/admin/import', label: 'CSV import' },
       { href: '/admin/settings', label: 'Settings' },
     ] });

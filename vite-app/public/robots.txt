@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /account
+Disallow: /dealer
+Disallow: /compare
+
+Sitemap: /sitemap.xml

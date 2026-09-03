@@ -5,6 +5,7 @@ import { Footer } from '@/components/Footer';
 import { CompareTray } from '@/components/CompareTray';
 import { getCurrentUser } from '@/lib/auth';
 import { JsonLd, organizationJsonLd, siteUrl } from '@/lib/seo';
+import { ADSENSE_JS_SRC } from '@/lib/ads';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
@@ -47,6 +48,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en-IN">
       <body className="flex min-h-screen flex-col">
+        <script async src={ADSENSE_JS_SRC} crossOrigin="anonymous" />
         <JsonLd data={organizationJsonLd()} />
         <Header user={user} />
         <main id="main" className="flex-1">{children}</main>

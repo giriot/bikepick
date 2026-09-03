@@ -11,6 +11,7 @@ import { SortSelect } from '@/components/Filters';
 import { AdSlot } from '@/components/AdSlot';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export const metadata = buildMetadata({
   title: 'Used Bikes for Sale in India — Verified Listings with Trust Scores',

@@ -30,7 +30,7 @@ export function SectionHeader({ title, subtitle, action }: { title: string; subt
   );
 }
 
-export function ScoreRing({ score, size = 74 }: { score: number; size?: number }) {
+export function ScoreRing({ score, size = 80, showValue = true }: { score: number; size?: number; showValue?: boolean }) {
   const r = (size - 10) / 2;
   const c = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(100, score));
@@ -41,10 +41,14 @@ export function ScoreRing({ score, size = 74 }: { score: number; size?: number }
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E7EBF0" strokeWidth="7" />
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={colour} strokeWidth="7" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} />
       </svg>
-      <div className="absolute inset-0 grid place-items-center">
-        <span className="text-[17px] font-bold leading-none">{score}</span>
-        <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wide text-ink-mute">/100</span>
-      </div>
+      {showValue && (
+        <div className="absolute inset-0 grid place-items-center overflow-hidden">
+          <span className="flex items-baseline gap-px whitespace-nowrap">
+            <span className="text-[17px] font-bold leading-none">{score}</span>
+            <span className="text-[8px] font-medium text-ink-mute">/100</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

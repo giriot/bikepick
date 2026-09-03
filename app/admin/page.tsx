@@ -20,25 +20,38 @@ export default async function AdminDashboard() {
   const settings = await getSettings();
   const since = new Date(Date.now() - 30 * 86400000).toISOString();
 
-  const [
-    products, published, usedPending, dealerPending, offerPending, reviewPending, changePending,
-    leads30, users30, revenue30, demoCount, recentAudit, recentLeads, sourceIssues,
-  ] = await Promise.all([
-    db.get<any>('SELECT COUNT(*) AS c FROM products WHERE deleted_at IS NULL'),
-    db.get<any>("SELECT COUNT(*) AS c FROM products WHERE status='published' AND deleted_at IS NULL"),
-    db.get<any>("SELECT COUNT(*) AS c FROM used_bikes WHERE status IN ('submitted','verification_required','under_review') AND deleted_at IS NULL"),
-    db.get<any>("SELECT COUNT(*) AS c FROM dealer_profiles WHERE status='pending' AND deleted_at IS NULL"),
-    db.get<any>("SELECT COUNT(*) AS c FROM dealer_offers WHERE status='pending' AND deleted_at IS NULL"),
-    db.get<any>("SELECT COUNT(*) AS c FROM reviews WHERE status='pending' AND deleted_at IS NULL"),
-    db.get<any>("SELECT COUNT(*) AS c FROM data_change_logs WHERE status='pending'"),
-    db.get<any>('SELECT COUNT(*) AS c FROM leads WHERE created_at >= ?', [since]),
-    db.get<any>('SELECT COUNT(*) AS c FROM users WHERE created_at >= ?', [since]),
-    db.get<any>('SELECT COALESCE(SUM(amount),0) AS c FROM revenue_events WHERE occurred_at >= ?', [since]),
-    db.get<any>('SELECT COUNT(*) AS c FROM products WHERE is_demo = 1 AND deleted_at IS NULL'),
-    db.all<any>('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 8'),
-    db.all<any>('SELECT l.*, p.name AS product_name FROM leads l LEFT JOIN products p ON p.id = l.product_id ORDER BY l.created_at DESC LIMIT 6'),
-    db.all<any>("SELECT * FROM data_sources WHERE status='failing' OR error_count > 0 ORDER BY error_count DESC LIMIT 5"),
-  ]);
+  let statsFailed = false;
+  const zero: any = { c: 0 };
+  let products: any = zero, published: any = zero, usedPending: any = zero, dealerPending: any = zero,
+    offerPending: any = zero, reviewPending: any = zero, changePending: any = zero,
+    leads30: any = zero, users30: any = zero, revenue30: any = zero, demoCount: any = zero;
+  let recentAudit: any[] = [], recentLeads: any[] = [], sourceIssues: any[] = [];
+  try {
+    [
+      products, published, usedPending, dealerPending, offerPending, reviewPending, changePending,
+      leads30, users30, revenue30, demoCount, recentAudit, recentLeads, sourceIssues,
+    ] = await Promise.all([
+      db.get<any>('SELECT COUNT(*) AS c FROM products WHERE deleted_at IS NULL'),
+      db.get<any>("SELECT COUNT(*) AS c FROM products WHERE status='published' AND deleted_at IS NULL"),
+      db.get<any>("SELECT COUNT(*) AS c FROM used_bikes WHERE status IN ('submitted','verification_required','under_review') AND deleted_at IS NULL"),
+      db.get<any>("SELECT COUNT(*) AS c FROM dealer_profiles WHERE status='pending' AND deleted_at IS NULL"),
+      db.get<any>("SELECT COUNT(*) AS c FROM dealer_offers WHERE status='pending' AND deleted_at IS NULL"),
+      db.get<any>("SELECT COUNT(*) AS c FROM reviews WHERE status='pending' AND deleted_at IS NULL"),
+      db.get<any>("SELECT COUNT(*) AS c FROM data_change_logs WHERE status='pending'"),
+      db.get<any>('SELECT COUNT(*) AS c FROM leads WHERE created_at >= ?', [since]),
+      db.get<any>('SELECT COUNT(*) AS c FROM users WHERE created_at >= ?', [since]),
+      db.get<any>('SELECT COALESCE(SUM(amount),0) AS c FROM revenue_events WHERE occurred_at >= ?', [since]),
+      db.get<any>('SELECT COUNT(*) AS c FROM products WHERE is_demo = 1 AND deleted_at IS NULL'),
+      db.all<any>('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 8'),
+      db.all<any>('SELECT l.*, p.name AS product_name FROM leads l LEFT JOIN products p ON p.id = l.product_id ORDER BY l.created_at DESC LIMIT 6'),
+      db.all<any>("SELECT * FROM data_sources WHERE status='failing' OR error_count > 0 ORDER BY error_count DESC LIMIT 5"),
+    ]);
+  } catch (e) {
+    // A slow/cold database must never blank the whole admin panel: degrade
+    // to zeroed counters with an explanation instead of an error screen.
+    statsFailed = true;
+    console.error('[admin/dashboard] stats query failed — rendering degraded dashboard:', e);
+  }
 
   const queue = [
     { label: 'Used listings awaiting review', count: n(usedPending), href: '/admin/used-bikes' },
@@ -60,6 +73,17 @@ export default async function AdminDashboard() {
     <div className="space-y-5">
       <AdminHeader title={`Welcome back, ${user?.full_name?.split(' ')[0] || 'there'}`}
         subtitle="Everything that needs a decision today, plus how the platform is performing." />
+
+      {statsFailed && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-[13.5px] font-semibold text-amber-900">Live statistics are temporarily unavailable</p>
+          <p className="mt-0.5 text-[12.5px] leading-5 text-amber-900/80">
+            The dashboard itself is working — only the live counters could not be loaded (this can happen for a few
+            seconds while the database connection is warming up). Press <b>F5</b> once or twice and they will be back.
+            Everything below that does not need live counters (links, settings, approvals) works normally.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <AdminStat label="Needs your attention" value={String(totalQueue)} hint={totalQueue ? 'Items waiting in a queue' : 'All queues clear'} />

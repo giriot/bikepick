@@ -3,6 +3,7 @@ import { ProductListing } from '@/components/ProductListing';
 import { buildMetadata, breadcrumbJsonLd, JsonLd } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export const metadata = buildMetadata({
   title: 'Electric Scooters & Bikes in India — Range, Charging and Running Cost',

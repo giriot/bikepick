@@ -30,8 +30,8 @@ export function SaveButton({ productId, usedBikeId, initialSaved = false, classN
   }
 
   return (
-    <span className="inline-flex flex-col items-start">
-      <button type="button" onClick={toggle} disabled={busy} className={className} aria-pressed={saved}>
+    <span className="flex w-full flex-col items-stretch">
+      <button type="button" onClick={toggle} disabled={busy} className={`${className} inline-flex items-center justify-center gap-2`.trim()} aria-pressed={saved}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
         </svg>

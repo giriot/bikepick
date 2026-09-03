@@ -2,6 +2,7 @@ import 'server-only';
 import { db, insert, nowIso, uid } from './db';
 import { slugify } from './slug';
 import { tableColumns } from './admin-query';
+import { syncProductPricesFromVariants } from './pricing-sync';
 import type { AdminResource } from './admin-config';
 import type { AppUser } from '@/types';
 
@@ -18,6 +19,7 @@ export async function normalisePayload(resource: AdminResource, body: Record<str
 
     let v = body[f.name];
     if (v === '' || v === undefined) v = null;
+    else if (typeof v === 'string' && v.trim().toLowerCase() === 'null') v = null;
 
     if (f.required && (v === null || v === '')) { errors[f.name] = `${f.label} is required`; continue; }
 
@@ -61,7 +63,9 @@ export async function createRow(resource: AdminResource, data: Record<string, an
   const record: Record<string, any> = { ...data, id: uid(resource.key.slice(0, 3)) };
   if (cols.has('created_by')) record.created_by = user.id;
   if (cols.has('normalized_key') && data.name) record.normalized_key = slugify(String(data.name));
-  return insert(resource.table, record);
+  const id = await insert(resource.table, record);
+  if (resource.key === 'variants') await syncProductPricesFromVariants(id); // prices follow the variants
+  return id;
 }
 
 export async function updateRow(resource: AdminResource, id: string, data: Record<string, any>) {
@@ -71,6 +75,7 @@ export async function updateRow(resource: AdminResource, id: string, data: Recor
     `UPDATE ${resource.table} SET ${keys.map((k) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`,
     [...keys.map((k) => data[k]), nowIso(), id],
   );
+  if (resource.key === 'variants') await syncProductPricesFromVariants(id);
 }
 
 export async function deleteRow(resource: AdminResource, id: string) {
@@ -79,4 +84,5 @@ export async function deleteRow(resource: AdminResource, id: string) {
   } else {
     await db.run(`DELETE FROM ${resource.table} WHERE id = ?`, [id]);
   }
+  if (resource.key === 'variants') await syncProductPricesFromVariants(id);
 }

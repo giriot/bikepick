@@ -4,7 +4,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 export interface FilterConfig {
-  brands: { slug: string; name: string; count: number }[];
+  brands: { slug: string; name: string; count: number; logo?: string | null }[];
   bodyTypes: string[];
   isEv?: boolean;
   priceMax: number;
@@ -83,6 +83,10 @@ export function Filters({ config }: { config: FilterConfig }) {
                 <label key={b.slug} className="flex cursor-pointer items-center gap-2 text-[13px]">
                   <input type="checkbox" checked={selectedBrands.includes(b.slug)} onChange={() => toggleBrand(b.slug)}
                     className="h-4 w-4 rounded border-line text-brand-500 focus:ring-brand-300" />
+                  {b.logo && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={b.logo} alt="" className="h-4 w-4 shrink-0 rounded-sm object-contain" />
+                  )}
                   <span className="flex-1 text-ink-soft">{b.name}</span>
                   <span className="text-xs text-ink-mute">{b.count}</span>
                 </label>

@@ -14,6 +14,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { AdSlot } from '@/components/AdSlot';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 async function load(slug: string) {
   const bike = await db.get<any>('SELECT * FROM used_bikes WHERE slug = ? AND deleted_at IS NULL', [slug]);
