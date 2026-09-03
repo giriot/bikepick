@@ -86,3 +86,7 @@ database/       Supabase/Postgres migrations (portable SQL)
 types/          shared TS types
 vite-app/       earlier Vite prototype (not deployed)
 ```
+
+---
+
+**Deployment:** this repository is connected to Vercel (project `bikepick`). Pushes to `main` deploy to https://bikepick.in automatically.
