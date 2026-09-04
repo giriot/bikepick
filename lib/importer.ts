@@ -13,6 +13,8 @@ export interface RowPlan {
   changes: { field: string; from: any; to: any }[];
   errors: string[];
   existingId?: string;
+  /** True when the row maps to a soft-deleted product that should be restored. */
+  restore?: boolean;
   data: Record<string, any>;
 }
 
@@ -73,7 +75,22 @@ export async function planImport(typeKey: string, rows: Record<string, string>[]
     if (errors.length) { plans.push({ index: i, action: 'error', label, changes: [], errors, data }); continue; }
 
     const existing = await findExisting(type, data);
-    if (!existing) { plans.push({ index: i, action: 'create', label, changes: [], errors: [], data }); continue; }
+    if (!existing) {
+      // A previously soft-deleted product still occupies the unique
+      // normalized_key index, so a plain INSERT would violate it. Point the
+      // plan at that row so apply can restore it instead of failing.
+      let restoreId: string | undefined;
+      let restore = false;
+      if (type.key === 'products') {
+        const ghost = await db.get<any>(
+          'SELECT id FROM products WHERE normalized_key = ? AND deleted_at IS NOT NULL LIMIT 1',
+          [normalizeKey(data.brand, data.name)],
+        );
+        if (ghost) { restoreId = ghost.id; restore = true; }
+      }
+      plans.push({ index: i, action: 'create', label, changes: [], errors: [], data, existingId: restoreId, restore });
+      continue;
+    }
 
     const changes = await diffAgainstExisting(type, existing, data);
     plans.push({
@@ -186,16 +203,29 @@ async function applyProduct(row: RowPlan, user: AppUser) {
   const isEv = d.fuel_type === 'electric';
   let productId = row.existingId;
 
-  if (!productId) {
-    // Resolve the real category from fuel + body type. The live categories are
-    // motorcycle / scooter / electric-scooter / electric-motorcycle — a null
-    // category_id makes the product invisible in /bikes and /electric listings.
-    const catSlug =
-      isEv
-        ? d.body_type === 'scooter' ? 'electric-scooter' : 'electric-motorcycle'
-        : d.body_type === 'scooter' ? 'scooter' : 'motorcycle';
-    let category = await db.get<any>('SELECT id FROM categories WHERE slug = ?', [catSlug]);
-    if (!category) category = await db.get<any>('SELECT id FROM categories WHERE active = 1 ORDER BY sort_order LIMIT 1');
+  // Resolve the real category from fuel + body type. The live categories are
+  // motorcycle / scooter / electric-scooter / electric-motorcycle — a null
+  // category_id makes the product invisible in /bikes and /electric listings.
+  const catSlug =
+    isEv
+      ? d.body_type === 'scooter' ? 'electric-scooter' : 'electric-motorcycle'
+      : d.body_type === 'scooter' ? 'scooter' : 'motorcycle';
+  let category = await db.get<any>('SELECT id FROM categories WHERE slug = ?', [catSlug]);
+  if (!category) category = await db.get<any>('SELECT id FROM categories WHERE active = 1 ORDER BY sort_order LIMIT 1');
+
+  if (productId && row.restore) {
+    // Restore a previously soft-deleted product (its normalized_key still
+    // holds the unique index, so a plain INSERT would fail). Refresh the data
+    // and bring it back without touching slug/normalized_key.
+    await db.run(
+      `UPDATE products SET brand_id = ?, category_id = ?, name = ?, fuel_type = ?, body_type = ?,
+        model_year = ?, price_min = ?, price_max = ?, status = ?, verification_status = ?,
+        deleted_at = NULL, updated_at = ? WHERE id = ?`,
+      [brandId, category?.id || null, d.name, d.fuel_type, d.body_type,
+       d.model_year, d.price_min, d.price_max, d.status || 'draft', 'admin_verified',
+       nowIso(), productId],
+    );
+  } else if (!productId) {
     productId = await insert('products', {
       id: uid('prd'), brand_id: brandId, category_id: category?.id || null,
       name: d.name, slug: slugify(`${d.brand}-${d.name}`), normalized_key: normalizeKey(d.brand, d.name),
