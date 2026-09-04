@@ -194,7 +194,7 @@ export async function applyImport(typeKey: string, plan: ImportPlan, user: AppUs
 async function brandIdFor(name: string) {
   const existing = await db.get<any>('SELECT id FROM brands WHERE LOWER(name) = ? AND deleted_at IS NULL', [name.toLowerCase()]);
   if (existing) return existing.id;
-  return insert('brands', { id: uid('brd'), name, slug: slugify(name), logo_license: 'unknown' });
+  return insert('brands', { id: uid('brd'), name, slug: slugify(name), logo_license_status: 'unknown' });
 }
 
 async function applyProduct(row: RowPlan, user: AppUser) {
