@@ -187,7 +187,15 @@ async function applyProduct(row: RowPlan, user: AppUser) {
   let productId = row.existingId;
 
   if (!productId) {
-    const category = await db.get<any>("SELECT id FROM categories WHERE slug IN ('bikes','two-wheelers') LIMIT 1");
+    // Resolve the real category from fuel + body type. The live categories are
+    // motorcycle / scooter / electric-scooter / electric-motorcycle — a null
+    // category_id makes the product invisible in /bikes and /electric listings.
+    const catSlug =
+      isEv
+        ? d.body_type === 'scooter' ? 'electric-scooter' : 'electric-motorcycle'
+        : d.body_type === 'scooter' ? 'scooter' : 'motorcycle';
+    let category = await db.get<any>('SELECT id FROM categories WHERE slug = ?', [catSlug]);
+    if (!category) category = await db.get<any>('SELECT id FROM categories WHERE active = 1 ORDER BY sort_order LIMIT 1');
     productId = await insert('products', {
       id: uid('prd'), brand_id: brandId, category_id: category?.id || null,
       name: d.name, slug: slugify(`${d.brand}-${d.name}`), normalized_key: normalizeKey(d.brand, d.name),
