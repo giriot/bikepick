@@ -4,6 +4,7 @@ import { authorizeCron } from '@/lib/cron';
 import { ok, fail, handleError } from '@/lib/api';
 import { notify } from '@/lib/notify';
 import { getSetting } from '@/lib/settings';
+import { isoDaysAgo } from '@/lib/iso';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,8 +20,8 @@ export async function GET(req: NextRequest) {
     const due = await db.all<any>(
       `SELECT id, brand_name, model_name, seller_id, slug FROM used_bikes
         WHERE status = 'approved' AND deleted_at IS NULL
-          AND COALESCE(approved_at, created_at) < date('now', ?)`,
-      [`-${Math.floor(days)} days`],
+          AND COALESCE(approved_at, created_at) < ?`,
+      [isoDaysAgo(Math.floor(days))],
     );
 
     for (const l of due) {

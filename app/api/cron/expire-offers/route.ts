@@ -3,6 +3,7 @@ import { db, nowIso } from '@/lib/db';
 import { authorizeCron } from '@/lib/cron';
 import { ok, fail, handleError } from '@/lib/api';
 import { notify } from '@/lib/notify';
+import { isoDaysAhead, isoToday } from '@/lib/iso';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,8 @@ export async function GET(req: NextRequest) {
     const due = await db.all<any>(
       `SELECT o.id, o.offer_text, d.user_id, d.business_name
          FROM dealer_offers o JOIN dealer_profiles d ON d.id = o.dealer_id
-        WHERE o.status = 'approved' AND o.end_date IS NOT NULL AND o.end_date < date('now') AND o.deleted_at IS NULL`,
+        WHERE o.status = 'approved' AND o.end_date IS NOT NULL AND o.end_date < ? AND o.deleted_at IS NULL`,
+      [isoToday()],
     );
     for (const o of due) {
       await db.run("UPDATE dealer_offers SET status = 'expired', updated_at = ? WHERE id = ?", [nowIso(), o.id]);
@@ -32,7 +34,8 @@ export async function GET(req: NextRequest) {
     const expiring = await db.all<any>(
       `SELECT o.id, o.offer_text, o.end_date, d.user_id
          FROM dealer_offers o JOIN dealer_profiles d ON d.id = o.dealer_id
-        WHERE o.status = 'approved' AND o.end_date = date('now','+3 days') AND o.deleted_at IS NULL`,
+        WHERE o.status = 'approved' AND o.end_date = ? AND o.deleted_at IS NULL`,
+      [isoDaysAhead(3)],
     );
     for (const o of expiring) {
       if (!o.user_id) continue;

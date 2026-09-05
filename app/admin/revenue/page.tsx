@@ -6,6 +6,7 @@ import { AdminHeader, AdminCard, AdminStat, Badge } from '@/components/admin/ui'
 import { BarChart, BreakdownBars } from '@/components/admin/Charts';
 import { sumDaily } from '@/lib/analytics';
 import { getSetting } from '@/lib/settings';
+import { isoMonthStart, sqlDateLiteral, sqlTodayLiteral } from '@/lib/iso';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Revenue · Bikepick Admin', robots: { index: false, follow: false } };
@@ -22,17 +23,23 @@ const STREAM_LABELS: Record<string, string> = {
 export default async function RevenuePage({ searchParams }: { searchParams: { range?: string } }) {
   await requirePermission('*');
   const days = Number(searchParams.range) || 30;
+  // Window boundaries as quoted 'YYYY-MM-DD' literals. SQLite's date() modifier
+  // syntax does not exist on Postgres, so the dates are computed in JS; the values
+  // are digits and dashes only, so inlining them cannot inject SQL.
+  const since = sqlDateLiteral(days);
+  const monthStart = `'${isoMonthStart()}'`;
+  const today = sqlTodayLiteral();
 
   const totals = await db.get<any>(
     `SELECT COALESCE(SUM(amount),0) AS all_time,
-            COALESCE(SUM(CASE WHEN occurred_at >= date('now','-${days} days') THEN amount END),0) AS period,
-            COALESCE(SUM(CASE WHEN occurred_at >= date('now','start of month') THEN amount END),0) AS month
+            COALESCE(SUM(CASE WHEN occurred_at >= ${since} THEN amount END),0) AS period,
+            COALESCE(SUM(CASE WHEN occurred_at >= ${monthStart} THEN amount END),0) AS month
        FROM revenue_events`,
   );
 
   const byStream = await db.all<any>(
     `SELECT stream, COALESCE(SUM(amount),0) AS total, COUNT(*) AS n
-       FROM revenue_events WHERE occurred_at >= date('now','-${days} days')
+       FROM revenue_events WHERE occurred_at >= ${since}
       GROUP BY stream ORDER BY total DESC`,
   );
 
@@ -47,11 +54,11 @@ export default async function RevenuePage({ searchParams }: { searchParams: { ra
       ORDER BY r.occurred_at DESC LIMIT 15`,
   );
   const activeSubs = await db.get<any>(
-    "SELECT COUNT(*) AS c FROM subscriptions WHERE status = 'active' AND (ends_at IS NULL OR ends_at >= date('now'))",
+    `SELECT COUNT(*) AS c FROM subscriptions WHERE status = 'active' AND (ends_at IS NULL OR ends_at >= ${today})`,
   );
   const leadValue = await db.get<any>(
     `SELECT COUNT(*) AS c, COALESCE(SUM(value_estimate),0) AS v FROM leads
-      WHERE deleted_at IS NULL AND created_at >= date('now','-${days} days')`,
+      WHERE deleted_at IS NULL AND created_at >= ${since}`,
   );
   const leadPrice = Number((await getSetting('lead_price_default')) ?? 49);
   const gateway = process.env.RAZORPAY_KEY_ID ? 'Razorpay connected' : 'No gateway keys configured';

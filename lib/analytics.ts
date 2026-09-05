@@ -1,5 +1,6 @@
 import 'server-only';
 import { db } from './db';
+import { isoDaysAgo } from './iso';
 
 export interface SeriesPoint { label: string; value: number }
 
@@ -8,9 +9,9 @@ export async function daily(table: string, dateColumn: string, days: number, whe
   const rows = await db.all<any>(
     `SELECT substr(${dateColumn}, 1, 10) AS d, COUNT(*) AS c
        FROM ${table}
-      WHERE ${where} AND ${dateColumn} >= date('now', ?)
+      WHERE ${where} AND ${dateColumn} >= ?
       GROUP BY d ORDER BY d`,
-    [...params, `-${days} days`],
+    [...params, isoDaysAgo(days)],
   );
   const map = new Map(rows.map((r) => [r.d, Number(r.c)]));
   const out: SeriesPoint[] = [];
@@ -24,9 +25,9 @@ export async function daily(table: string, dateColumn: string, days: number, whe
 export async function sumDaily(table: string, dateColumn: string, valueColumn: string, days: number, where = '1=1'): Promise<SeriesPoint[]> {
   const rows = await db.all<any>(
     `SELECT substr(${dateColumn}, 1, 10) AS d, SUM(${valueColumn}) AS v
-       FROM ${table} WHERE ${where} AND ${dateColumn} >= date('now', ?)
+       FROM ${table} WHERE ${where} AND ${dateColumn} >= ?
       GROUP BY d ORDER BY d`,
-    [`-${days} days`],
+    [isoDaysAgo(days)],
   );
   const map = new Map(rows.map((r) => [r.d, Number(r.v || 0)]));
   const out: SeriesPoint[] = [];

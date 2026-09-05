@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/rbac';
 import { relative } from '@/lib/format';
+import { sqlDateLiteral } from '@/lib/iso';
 import { AdminHeader, AdminCard, AdminStat } from '@/components/admin/ui';
 import { BarChart, BreakdownBars } from '@/components/admin/Charts';
 import { daily, count } from '@/lib/analytics';
@@ -12,7 +13,9 @@ export const metadata = { title: 'Analytics · Bikepick Admin', robots: { index:
 export default async function AnalyticsPage({ searchParams }: { searchParams: { range?: string } }) {
   await requirePermission('*');
   const days = Number(searchParams.range) || 30;
-  const since = `date('now','-${days} days')`;
+  // Quoted 'YYYY-MM-DD' literal, interpolated below. `date('now', …)` is a SQLite
+  // function and throws on Postgres, so the window is computed here instead.
+  const since = sqlDateLiteral(days);
 
   const [leads, listings, signups, reviews] = await Promise.all([
     daily('leads', 'created_at', days, 'deleted_at IS NULL'),
