@@ -101,6 +101,13 @@ export function AiSpecQueuePanel({
         <Button disabled={running} onClick={() => call({ action: 'clear-finished' }, 'clear')}>
           {running === 'clear' ? 'Clearing…' : 'Clear finished jobs'}
         </Button>
+        <a
+          href="/api/admin/export/spec-sheet?status=all&onlygaps=0"
+          className="rounded-md border border-line bg-white px-2.5 py-1.5 text-[12px] font-medium hover:bg-surface"
+          title="One CSV: every model, every spec column, plus which fields are still empty"
+        >
+          Download single sheet (CSV)
+        </a>
         <label className="ml-auto flex items-center gap-1.5 text-[12px] text-ink-mute">
           <input type="checkbox" checked={includeDrafts} onChange={(e) => setIncludeDrafts(e.target.checked)} className="h-3.5 w-3.5" />
           include drafts when scanning
