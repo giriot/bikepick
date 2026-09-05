@@ -15,6 +15,7 @@ import { PriceAlertButton } from '@/components/PriceAlertButton';
 import { CompareToggle } from '@/components/CompareToggle';
 import { SaveButton } from '@/components/SaveButton';
 import { VariantTable } from '@/components/VariantTable';
+import { FullSpecSheet } from '@/components/FullSpecSheet';
 import { ProductGallery } from '@/components/ProductGallery';
 import { SpecSuggestionForm } from '@/components/SpecSuggestionForm';
 import { featureAdvantage } from '@/lib/spec-dots';
@@ -333,6 +334,10 @@ export default async function ProductPage({ params, searchParams }: Params) {
                 priceFrom={product.price_min}
               />
             )}
+
+            {/* Full specification sheet */}
+            <FullSpecSheet bike={bike} ev={ev} isEv={isEv} />
+
             {/* Actions — all real, compact */}
             <div className="mt-5 grid grid-cols-2 gap-2">
               <LeadDialog
