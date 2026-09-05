@@ -126,8 +126,21 @@ async function findExisting(type: ImportType, data: Record<string, any>) {
     [String(data.name).toLowerCase(), String(data.city || '').toLowerCase()]);
 }
 
-const PRODUCT_SPEC_FIELDS = ['engine_capacity_cc', 'max_power_bhp', 'max_torque_nm', 'mileage_kmpl', 'fuel_tank_l', 'kerb_weight_kg', 'seat_height_mm', 'abs_type', 'top_speed_kmph'];
-const EV_SPEC_FIELDS = ['battery_capacity_kwh', 'claimed_range_km', 'real_world_range_km', 'motor_power_kw', 'top_speed_kmph'];
+const PRODUCT_SPEC_FIELDS = [
+  'engine_type', 'engine_capacity_cc', 'max_power_bhp', 'max_power_rpm', 'max_torque_nm', 'max_torque_rpm',
+  'transmission', 'clutch', 'gearbox', 'top_speed_kmph', 'mileage_kmpl', 'fuel_tank_l',
+  'length_mm', 'width_mm', 'height_mm', 'wheelbase_mm', 'seat_height_mm', 'ground_clearance_mm', 'kerb_weight_kg',
+  'front_tyre', 'rear_tyre', 'front_brake', 'rear_brake', 'abs_type', 'cbs', 'traction_control',
+  'suspension_front', 'suspension_rear', 'wheel_type', 'headlight', 'tail_light', 'drl', 'instrument_cluster',
+  'seat_type', 'bluetooth', 'navigation', 'usb_charging', 'keyless_start', 'cruise_control', 'ride_modes',
+  'hill_hold', 'reverse_mode', 'warranty', 'service_interval_km', 'est_service_cost', 'accessories', 'colours',
+];
+const EV_SPEC_FIELDS = [
+  'motor_power_kw', 'peak_power_kw', 'torque_nm', 'battery_capacity_kwh', 'battery_chemistry', 'battery_warranty',
+  'claimed_range_km', 'real_world_range_km', 'range_basis', 'charging_time_hours', 'fast_charging',
+  'fast_charge_time_min', 'charging_connector', 'home_charging', 'portable_charger', 'top_speed_kmph',
+  'regen_braking', 'ride_modes', 'kerb_weight_kg', 'warranty', 'running_cost_per_km', 'est_battery_replacement_cost',
+];
 
 async function diffAgainstExisting(type: ImportType, existing: any, data: Record<string, any>) {
   const changes: { field: string; from: any; to: any }[] = [];
