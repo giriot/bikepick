@@ -2,61 +2,49 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-
-const MAX_AUTO_RETRIES = 5;
-const WINDOW_MS = 180_000;
-const DELAYS = [800, 2000, 4500, 9000, 15000];
+import { RETRY_DELAYS_MS, markErrorBoundaryRendering, takeRetryBudget } from '@/lib/retry-budget';
 
 /**
  * Self-healing error boundary.
  *
- * A first request after a quiet period may hit a cold server that takes a
- * little too long to wake up (the request gets cut off before it finishes).
- * Instead of showing the scary error screen, we quietly reload — up to 3
- * times within 2 minutes, with increasing waits. By the second or third
- * attempt the server is warm and the page renders. Only if every attempt
- * fails do we show the error screen with a manual "Try again".
+ * Two different failures land here and need different treatment:
+ *
+ * 1. A cold or briefly unavailable server — the RSC payload for the page could
+ *    not be fetched. Waiting a moment and asking for the *document* again fixes
+ *    it, so we reload up to five times with increasing waits (see
+ *    lib/retry-budget.ts for the window).
+ * 2. A stale tab after a deployment. The HTML the browser already has points at
+ *    `/_next/static/chunks/….js` from the previous build, which no longer
+ *    resolves, so a module import throws during render.
+ *
+ * In both cases the recovery step is the same: re-fetch the document.
+ * `reset()` only re-renders the components that are already in memory, so it
+ * cannot repair a missing chunk or re-run a server query — that is why it is no
+ * longer used for the automatic attempts.
  */
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const [failed, setFailed] = useState(false);
   const fired = useRef(false);
+
+  // Read by the layout so a successful mount does not refill the budget while a
+  // recovery cycle is still running. Assigned during render, before any parent
+  // effect can observe the tree.
+  markErrorBoundaryRendering();
 
   useEffect(() => {
     if (fired.current) return;
     fired.current = true;
     console.error('[global-error]', error);
 
-    let allowed = false;
-    let attempt = 1;
-    try {
-      const key = 'bp_retry_' + window.location.pathname;
-      const now = Date.now();
-      const raw = sessionStorage.getItem(key);
-      let count = 0;
-      let first = now;
-      if (raw) {
-        try {
-          const s = JSON.parse(raw);
-          count = s.count || 0;
-          first = s.first || now;
-        } catch { /* ignore */ }
-      }
-      if (count < MAX_AUTO_RETRIES && now - first < WINDOW_MS) {
-        allowed = true;
-        attempt = count + 1;
-        sessionStorage.setItem(key, JSON.stringify({ count: attempt, first }));
-      }
-    } catch {
-      allowed = true;
+    const attempt = takeRetryBudget(window.location.pathname);
+    if (attempt === null) {
+      setFailed(true);
+      return;
     }
-
-    if (allowed) {
-      const delay = DELAYS[Math.min(attempt - 1, DELAYS.length - 1)];
-      const t = setTimeout(() => reset(), delay);
-      return () => clearTimeout(t);
-    }
-    setFailed(true);
-  }, [error, reset]);
+    const delay = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
+    const t = setTimeout(() => window.location.reload(), delay);
+    return () => clearTimeout(t);
+  }, [error]);
 
   if (!failed) {
     return (
@@ -77,12 +65,24 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
       <div className="max-w-md">
         <h1 className="text-2xl font-bold tracking-[-0.03em]">Something went wrong</h1>
         <p className="mt-3 text-sm text-ink-mute">
-          The page could not be rendered. Existing data has not been changed.
+          The page could not be rendered. Existing data has not been changed. Reloading usually
+          clears it — this screen appears once the page has already retried on its own.
         </p>
-        <div className="mt-6 flex justify-center gap-2">
-          <button type="button" onClick={reset} className="btn-primary">Try again</button>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button type="button" onClick={() => window.location.reload()} className="btn-primary">
+            Reload the page
+          </button>
+          <button type="button" onClick={reset} className="btn-outline">
+            Try again
+          </button>
           <Link href="/" className="btn-outline">Homepage</Link>
         </div>
+        {error?.digest ? (
+          <p className="mt-5 text-[11.5px] leading-relaxed text-ink-mute">
+            Reference <code className="rounded bg-surface px-1.5 py-0.5">{error.digest}</code>
+            {' '}when reporting this — it matches the entry in the deployment logs.
+          </p>
+        ) : null}
       </div>
     </div>
   );

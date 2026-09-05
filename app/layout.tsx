@@ -3,6 +3,7 @@ import './globals.css';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { CompareTray } from '@/components/CompareTray';
+import { RetryBudgetReset } from '@/components/RetryBudgetReset';
 import { getCurrentUser } from '@/lib/auth';
 import { JsonLd, organizationJsonLd, siteUrl } from '@/lib/seo';
 import { ADSENSE_JS_SRC } from '@/lib/ads';
@@ -54,6 +55,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main id="main" className="flex-1">{children}</main>
         <Footer />
         <CompareTray />
+        <RetryBudgetReset />
       </body>
     </html>
   );
