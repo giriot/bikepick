@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS ai_spec_jobs (
   -- JSON arrays/objects kept for transparency + a manual undo path.
   filled_keys TEXT,
   previous_values TEXT,
+  -- spec keys the model offered but we refused to auto-write (see SPEC_WRITE_DENY):
+  -- invented-looking figures stay visible for a human instead of hitting the site.
+  suggested_keys TEXT,
   requested_by TEXT REFERENCES users(id),
   started_at TEXT,
   finished_at TEXT,

@@ -9,7 +9,7 @@ type Summary = {
 type Job = {
   id: string; status: string; attempts: number; max_attempts: number; next_run_at: string | null;
   last_error: string | null; provider: string | null; missing_before: number | null;
-  fields_filled: number | null; filled_keys: string | null;
+  fields_filled: number | null; filled_keys: string | null; suggested_keys?: string | null;
   product_name: string; brand_name: string; product_status: string; fuel_type: string | null;
 };
 
@@ -95,6 +95,9 @@ export function AiSpecQueuePanel({
         <Button disabled={running} onClick={() => call({ action: 'retry-now' }, 'retry')}>
           {running === 'retry' ? 'Forcing…' : 'Force deferred jobs now'}
         </Button>
+        <Button disabled={running || summary.applied === 0} onClick={() => call({ action: 'revert', ids: jobs.filter((j) => j.status === 'applied').map((j) => j.id).join(',') }, 'revert')}>
+          {running === 'revert' ? 'Reverting…' : 'Undo last AI values (all applied)'}
+        </Button>
         <Button disabled={running} onClick={() => call({ action: 'clear-finished' }, 'clear')}>
           {running === 'clear' ? 'Clearing…' : 'Clear finished jobs'}
         </Button>
@@ -147,7 +150,8 @@ export function AiSpecQueuePanel({
                 <td className="px-3 py-2 tabular-nums">{j.missing_before ?? '—'}</td>
                 <td className="px-3 py-2 tabular-nums">
                   {j.fields_filled ? `${j.fields_filled} field(s)` : '—'}
-                  {j.filled_keys && <KeyList json={j.filled_keys} />}
+                  {j.filled_keys && <KeyList json={j.filled_keys} label="which fields" />}
+                  {j.suggested_keys && <KeyList json={j.suggested_keys} label="held for review" tone="text-warn" />}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-ink-mute">
                   {['queued', 'deferred'].includes(j.status) && j.next_run_at ? new Date(j.next_run_at).toLocaleString('en-IN') : '—'}
@@ -168,13 +172,13 @@ export function AiSpecQueuePanel({
   );
 }
 
-function KeyList({ json }: { json: string }) {
+function KeyList({ json, label, tone = 'text-brand-600' }: { json: string; label: string; tone?: string }) {
   let keys: string[] = [];
-  try { keys = JSON.parse(json); } catch { return null; }
+  try { const parsed = JSON.parse(json); keys = Array.isArray(parsed) ? parsed : Object.keys(parsed); } catch { return null; }
   if (!keys.length) return null;
   return (
     <details className="mt-0.5">
-      <summary className="cursor-pointer text-[10.5px] text-brand-600">which fields</summary>
+      <summary className={`cursor-pointer text-[10.5px] ${tone}`}>{label} ({keys.length})</summary>
       <span className="text-[10.5px]">{keys.join(', ')}</span>
     </details>
   );

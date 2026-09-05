@@ -17,7 +17,7 @@ export default async function AiSpecQueuePage() {
     queueSummary(),
     db.all<any>(
       `SELECT j.id, j.status, j.attempts, j.max_attempts, j.next_run_at, j.last_error,
-              j.provider, j.missing_before, j.fields_filled, j.filled_keys,
+              j.provider, j.missing_before, j.fields_filled, j.filled_keys, j.suggested_keys,
               p.name AS product_name, p.status AS product_status, p.fuel_type, b.name AS brand_name
          FROM ai_spec_jobs j
          JOIN products p ON p.id = j.product_id

@@ -40,6 +40,19 @@ const DEFAULT_BUDGET_MS = 50_000;
 const DEFAULT_MAX_JOBS = 3;
 const MAX_BACKOFF_MINUTES = 720; // 12h — a free tier can stay throttled all day
 
+/**
+ * Columns the queue will NOT auto-write. These are the figures a model can only
+ * guess at — service schedules, running costs, warranty wording, dealer
+ * accessories, colour ranges — and every one of them is a real, visible claim on
+ * a public page. Under the project's rule (never fabricate specs) they are
+ * captured as *suggestions* on the job for a human to check and paste in, while
+ * objectively verifiable equipment and dimensions are applied normally.
+ */
+export const SPEC_WRITE_DENY = new Set([
+  'est_service_cost', 'service_interval_km', 'accessories', 'colours', 'warranty',
+  'battery_warranty', 'est_battery_replacement_cost', 'running_cost_per_km',
+]);
+
 export type JobStatus = 'queued' | 'running' | 'applied' | 'deferred' | 'failed' | 'skipped';
 
 interface SpecTarget {
@@ -78,8 +91,15 @@ function coerce(value: unknown, key: string, t: SpecTarget): string | number | n
     const n = Number(String(value).replace(/[^\d.\-]/g, ''));
     return Number.isFinite(n) ? n : null;
   }
+  // A text column must not receive a boolean: `true` rendered on a spec sheet
+  // reads as a fact, not a flag. Drop it (the value belongs in a bool column).
+  if (typeof value === 'boolean') return null;
+  if (Array.isArray(value)) {
+    const parts = value.map((v) => String(v).trim()).filter(Boolean).slice(0, 12);
+    return parts.length ? parts.join(', ').slice(0, 500) : null;
+  }
   const s = String(value).trim();
-  if (!s || /^(n\/a|na|not recorded|not available|unknown|—|-)$/.test(s.toLowerCase())) return null;
+  if (!s || /^(n\/a|na|not recorded|not available|unknown|—|-|true|false|null|none|yes)$/.test(s.toLowerCase())) return null;
   return s.slice(0, 500);
 }
 
@@ -213,25 +233,31 @@ export async function runQueue(opts: {
       const applied = await applySpecs(job.product_id, job.fuel_type, draft.specs);
 
       if (!applied.filled.length) {
-        // AI answered but offered nothing we were allowed to write.
+        // AI answered but offered nothing we are allowed to auto-write; any
+        // held-back values are still stored so they are not lost.
         await db.run(
           `UPDATE ai_spec_jobs SET status = 'skipped', claim_token = NULL, finished_at = ?,
-                  last_error = NULL, updated_at = ? WHERE id = ?`,
-          [nowIso(), nowIso(), job.id],
+                  last_error = NULL, suggested_keys = ?, updated_at = ? WHERE id = ?`,
+          [nowIso(), JSON.stringify(applied.suggested), nowIso(), job.id],
         );
         out.skipped++;
-        out.details.push({ product: label, outcome: 'skipped', fields: 0, note: 'no new values offered' });
+        out.details.push({
+          product: label, outcome: 'skipped', fields: 0,
+          note: Object.keys(applied.suggested).length
+            ? `${Object.keys(applied.suggested).length} suggestion(s) held for review`
+            : 'no new values offered',
+        });
         continue;
       }
 
       await db.run(
         `UPDATE ai_spec_jobs SET status = 'applied', claim_token = NULL, finished_at = ?,
                 provider = ?, fields_filled = ?, filled_keys = ?, previous_values = ?,
-                last_error = NULL, updated_at = ? WHERE id = ?`,
+                suggested_keys = ?, last_error = NULL, updated_at = ? WHERE id = ?`,
         [
           nowIso(), draft.provider ?? null, applied.filled.length,
           JSON.stringify(applied.filled), JSON.stringify(applied.previous),
-          nowIso(), job.id,
+          JSON.stringify(applied.suggested), nowIso(), job.id,
         ],
       );
       // Keep the model's updated_at in step so sitemap lastMod and the admin
@@ -271,7 +297,7 @@ export async function runQueue(opts: {
 /** Write AI values into the spec row, but only where it is currently empty. */
 async function applySpecs(
   productId: string, fuelType: string | null, specs: Record<string, any>,
-): Promise<{ filled: string[]; previous: Record<string, unknown> }> {
+): Promise<{ filled: string[]; previous: Record<string, unknown>; suggested: Record<string, unknown> }> {
   const t = targetFor(fuelType);
   const row = await db.get<any>(
     `SELECT * FROM ${t.table} WHERE product_id = ? AND variant_id IS NULL`, [productId],
@@ -279,15 +305,18 @@ async function applySpecs(
 
   const toSet: Record<string, string | number> = {};
   const previous: Record<string, unknown> = {};
+  const suggested: Record<string, unknown> = {};
   for (const key of t.keys) {
     const current = row?.[key];
     if (current !== null && current !== undefined) continue; // never overwrite curated data
     const value = coerce(specs?.[key], key, t);
     if (value === null) continue;
+    // Held back for human review rather than published on the AI's say-so.
+    if (SPEC_WRITE_DENY.has(key)) { suggested[key] = value; continue; }
     toSet[key] = value;
     previous[key] = null;
   }
-  if (!Object.keys(toSet).length) return { filled: [], previous };
+  if (!Object.keys(toSet).length) return { filled: [], previous, suggested };
 
   const keys = Object.keys(toSet);
   if (!row) {
@@ -298,7 +327,43 @@ async function applySpecs(
       [...keys.map((k) => toSet[k]), nowIso(), row.id],
     );
   }
-  return { filled: keys, previous };
+  return { filled: keys, previous, suggested };
+}
+
+/**
+ * Undo one applied job: every key the job filled is returned to the value it
+ * had before (always NULL, since we only ever write into empty fields). Lets a
+ * bad AI batch be rolled back without hand-written SQL.
+ */
+export async function revertJob(jobId: string): Promise<{ product_id: string | null; reverted: number }> {
+  const job = await db.get<any>(
+    `SELECT id, product_id, status, filled_keys FROM ai_spec_jobs WHERE id = ?`, [jobId],
+  );
+  if (!job) return { product_id: null, reverted: 0 };
+  const keys: string[] = (() => { try { return JSON.parse(job.filled_keys || '[]'); } catch { return []; } })()
+    .filter((k) => typeof k === 'string');
+  if (!keys.length) return { product_id: job.product_id, reverted: 0 };
+
+  const product = await db.get<any>(`SELECT id, fuel_type FROM products WHERE id = ?`, [job.product_id]);
+  const t = targetFor(product?.fuel_type);
+  // Defensive: only null columns that really belong to this spec table.
+  const safe = keys.filter((k) => (t.keys as readonly string[]).includes(k));
+  const row = await db.get<any>(
+    `SELECT id FROM ${t.table} WHERE product_id = ? AND variant_id IS NULL`, [job.product_id],
+  );
+  if (row && safe.length) {
+    await db.run(
+      `UPDATE ${t.table} SET ${safe.map((k) => `${k} = NULL`).join(', ')}, updated_at = ? WHERE id = ?`,
+      [nowIso(), row.id],
+    );
+  }
+  await db.run(
+    `UPDATE ai_spec_jobs SET status = 'queued', fields_filled = 0, filled_keys = NULL,
+            previous_values = NULL, attempts = 0, next_run_at = ?, last_error = 'reverted by admin',
+            finished_at = NULL, updated_at = ? WHERE id = ?`,
+    [minutesFromNow(60), nowIso(), jobId],
+  );
+  return { product_id: job.product_id, reverted: safe.length };
 }
 
 async function logApply(userId: string | null, job: any, label: string, applied: { filled: string[] }) {

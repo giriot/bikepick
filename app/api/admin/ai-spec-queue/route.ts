@@ -3,7 +3,7 @@ import { db, nowIso } from '@/lib/db';
 import { requirePermission } from '@/lib/rbac';
 import { handleError, ok, fail, readJson } from '@/lib/api';
 import { audit } from '@/lib/audit';
-import { enqueueModels, queueSummary, runQueue } from '@/lib/ai-spec-queue';
+import { enqueueModels, queueSummary, revertJob, runQueue } from '@/lib/ai-spec-queue';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ export async function GET() {
       queueSummary(),
       db.all<any>(
         `SELECT j.id, j.status, j.attempts, j.max_attempts, j.next_run_at, j.last_error,
-                j.provider, j.missing_before, j.fields_filled, j.filled_keys, j.started_at,
+                j.provider, j.missing_before, j.fields_filled, j.filled_keys, j.suggested_keys, j.started_at,
                 j.finished_at, j.updated_at,
                 p.name AS product_name, p.slug AS product_slug, p.status AS product_status,
                 p.fuel_type, b.name AS brand_name
@@ -88,6 +88,15 @@ export async function POST(req: NextRequest) {
       }
       await audit(user, 'ai_spec.retry_now', 'ai_spec_jobs', undefined, { ids: ids.length });
       return ok({ forced: ids.length || 'all' }, 'Jobs are due again');
+    }
+
+    if (action === 'revert') {
+      const ids = String(body.ids || '').split(',').map((s: string) => s.trim()).filter(Boolean).slice(0, 200);
+      if (!ids.length) return fail('Nothing selected to revert', 422);
+      let reverted = 0;
+      for (const id of ids) reverted += (await revertJob(id)).reverted;
+      await audit(user, 'ai_spec.revert', 'ai_spec_jobs', ids.join(','), { reverted });
+      return ok({ jobs: ids.length, reverted }, `Reverted ${reverted} field(s) back to empty`);
     }
 
     if (action === 'clear-finished') {
