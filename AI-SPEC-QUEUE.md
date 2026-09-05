@@ -92,3 +92,18 @@ open in a spreadsheet.
 | `app/admin/ai-spec-queue/page.tsx` + `components/admin/AiSpecQueuePanel.tsx` | UI |
 | `app/api/cron/ai-spec-queue/route.ts` | headless driver (`CRON_SECRET`) |
 | `app/api/admin/export/spec-sheet/route.ts` | single-sheet CSV |
+
+## How the scan and the retry loop behave
+
+* **Scanning the catalogue is one SQL pass per spec table.** It counts the empty
+  columns inside Postgres/SQLite (`CASE WHEN s.<col> IS NOT NULL`) instead of
+  asking per model, and inserts new jobs 40 rows at a time. Covering all 166
+  models costs four queries, not ~600.
+* **Re-scanning is safe.** Models that already have a job in `queued`, `deferred`
+  or `running` are left alone; `applied`, `failed` and `skipped` jobs are reset so
+  a model can be filled again as its gaps change. `filled_keys`,
+  `previous_values` and `suggested_keys` are never cleared by a scan, so *Undo
+  last AI values* keeps working across scans.
+* **A batch that dies half-way does not strand the queue.** A job pinned in
+  `running` (function killed, redeploy mid-run) becomes claimable again after 10
+  minutes, along with anything `queued` or `deferred` that is due.

@@ -40,6 +40,9 @@ const DEFAULT_BUDGET_MS = 50_000;
 const DEFAULT_MAX_JOBS = 3;
 const MAX_BACKOFF_MINUTES = 720; // 12h — a free tier can stay throttled all day
 
+/** A 'running' claim older than this is treated as abandoned and re-queued. */
+const STALE_CLAIM_MS = 10 * 60_000;
+
 /**
  * Columns the queue will NOT auto-write. These are the figures a model can only
  * guess at — service schedules, running costs, warranty wording, dealer
@@ -103,13 +106,47 @@ function coerce(value: unknown, key: string, t: SpecTarget): string | number | n
   return s.slice(0, 500);
 }
 
-/** Count NULL spec fields on the model-level row (variant_id IS NULL). */
+/**
+ * Per-table SQL that yields (product_id, missing_count) for every non-deleted
+ * product in ONE pass. Counting the holes column-by-column per product was an
+ * N+1 that took ~38s over 166 models and risked the request limit, so the work
+ * moved into SQL. `filled` is a sum of CASE terms over the whitelisted columns —
+ * identifiers come from our own SPEC_KEYS arrays, never from user input.
+ */
+function missingCountSql(table: string, keys: readonly string[]): string {
+  const filled = keys.map((k) => `(CASE WHEN s.${k} IS NOT NULL THEN 1 ELSE 0 END)`).join(' + ');
+  return `SELECT p.id, p.fuel_type,
+                 CASE WHEN s.product_id IS NULL THEN ${keys.length}
+                      ELSE ${keys.length} - (${filled}) END AS missing
+            FROM products p
+            LEFT JOIN ${table} s ON s.product_id = p.id AND s.variant_id IS NULL
+           WHERE p.deleted_at IS NULL`;
+}
+
+/** The still-empty whitelisted columns for one product (used by single-model paths). */
 async function missingFields(productId: string, fuelType: string | null): Promise<string[]> {
   const t = targetFor(fuelType);
   const row = await db.get<any>(
     `SELECT * FROM ${t.table} WHERE product_id = ? AND variant_id IS NULL`, [productId],
   );
   return t.keys.filter((k) => row?.[k] === null || row?.[k] === undefined);
+}
+
+/** Multi-row INSERT with ? placeholders — supported by SQLite and Postgres alike. */
+async function insertJobs(rows: Record<string, string | number | null>[]): Promise<number> {
+  if (!rows.length) return 0;
+  const cols = ['id', 'product_id', 'status', 'attempts', 'max_attempts', 'next_run_at',
+                'missing_before', 'requested_by', 'created_at', 'updated_at'];
+  const CHUNK = 40;
+  let n = 0;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const values = chunk.map(() => `(${cols.map(() => '?').join(', ')})`).join(', ');
+    const params = chunk.flatMap((r) => cols.map((c) => r[c] as string | number | null));
+    await db.run(`INSERT INTO ai_spec_jobs (${cols.join(', ')}) VALUES ${values}`, params);
+    n += chunk.length;
+  }
+  return n;
 }
 
 export interface EnqueueResult {
@@ -128,51 +165,69 @@ export async function enqueueModels(opts: {
   userId?: string | null;
 } = {}): Promise<EnqueueResult> {
   const statuses = opts.statuses?.length ? opts.statuses : ['published'];
-  const limit = Math.max(1, Math.min(Number(opts.limit) || 200, 500));
+  const limit = Math.max(1, Math.min(Number(opts.limit) || 500, 1000));
   const skipComplete = opts.skipComplete !== false;
   const res: EnqueueResult = { created: 0, reset: 0, already_queued: 0, complete: 0, considered: 0 };
 
   const placeholders = statuses.map(() => '?').join(',');
-  const models = await db.all<any>(
-    `SELECT p.id, p.fuel_type FROM products p
-      WHERE p.deleted_at IS NULL AND p.status IN (${placeholders})
-      ORDER BY p.brand_id, p.name LIMIT ${Math.trunc(limit)}`,
-    statuses,
-  );
+  const statusSql = `p.status IN (${placeholders})`;
+  const params = [...statuses];
 
-  for (const m of models) {
-    res.considered++;
-    const missing = await missingFields(m.id, m.fuel_type);
-    const existing = await db.get<any>(`SELECT id, status FROM ai_spec_jobs WHERE product_id = ?`, [m.id]);
+  // One pass per spec table; each row is (product_id, fuel_type, missing).
+  const [bikeRows, evRows] = await Promise.all([
+    db.all<any>(`${missingCountSql('bike_specs', BIKE_SPEC_KEYS)} AND ${statusSql} AND (p.fuel_type IS NULL OR p.fuel_type <> 'electric')
+                  ORDER BY p.brand_id, p.name LIMIT ${Math.trunc(limit)}`, params),
+    db.all<any>(`${missingCountSql('ev_specs', EV_SPEC_KEYS)} AND ${statusSql} AND p.fuel_type = 'electric'
+                  ORDER BY p.brand_id, p.name LIMIT ${Math.trunc(limit)}`, params),
+  ]);
+
+  const candidates = [...bikeRows, ...evRows]
+    // A row whose id is missing would enqueue a job that can never resolve to a
+    // product, and a NULL product_id is a NOT NULL violation on Postgres/SQLite.
+    .filter((c) => typeof c.id === 'string' && c.id)
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)))
+    .slice(0, limit);
+  res.considered = candidates.length;
+  if (!candidates.length) return res;
+
+  const jobs = await db.all<any>(`SELECT id, product_id, status, missing_before FROM ai_spec_jobs`);
+  const byProduct = new Map(jobs.map((j) => [j.product_id, j]));
+
+  const toInsert: Record<string, string | number | null>[] = [];
+  const now = nowIso();
+  const resets: string[] = [];
+
+  for (const c of candidates) {
+    const missing = Number(c.missing || 0);
+    const existing = byProduct.get(c.id);
 
     if (existing) {
       if (['applied', 'failed', 'skipped'].includes(existing.status)) {
-        if (!missing.length && skipComplete) { res.complete++; continue; }
-        await db.run(
-          `UPDATE ai_spec_jobs SET status = 'queued', attempts = 0, next_run_at = ?, last_error = NULL,
-                  finished_at = NULL, claim_token = NULL, missing_before = ?, updated_at = ?
-             WHERE id = ?`,
-          [nowIso(), missing.length, nowIso(), existing.id],
-        );
-        res.reset++;
+        if (!missing && skipComplete) { res.complete++; continue; }
+        resets.push(existing.id);
       } else {
         res.already_queued++;
       }
       continue;
     }
-
-    if (!missing.length && skipComplete) { res.complete++; continue; }
-    await insert('ai_spec_jobs', {
-      id: uid('asj'),
-      product_id: m.id,
-      status: 'queued',
-      attempts: 0,
-      max_attempts: 8,
-      next_run_at: nowIso(),
-      missing_before: missing.length,
-      requested_by: opts.userId ?? null,
+    if (!missing && skipComplete) { res.complete++; continue; }
+    toInsert.push({
+      id: uid('asj'), product_id: c.id, status: 'queued', attempts: 0, max_attempts: 8,
+      next_run_at: now, missing_before: missing, requested_by: opts.userId ?? null,
+      created_at: now, updated_at: now,
     });
-    res.created++;
+  }
+
+  res.created = await insertJobs(toInsert);
+
+  if (resets.length) {
+    const ph = resets.map(() => '?').join(',');
+    await db.run(
+      `UPDATE ai_spec_jobs SET status = 'queued', attempts = 0, next_run_at = ?, last_error = NULL,
+              finished_at = NULL, claim_token = NULL, updated_at = ? WHERE id IN (${ph})`,
+      [now, now, ...resets],
+    );
+    res.reset = resets.length;
   }
   return res;
 }
@@ -199,16 +254,22 @@ export async function runQueue(opts: {
     quotaLimited: false, stoppedBy: 'empty', remaining: 0, details: [],
   };
 
+  // A batch killed mid-flight (function limit, redeploy) would otherwise leave
+  // rows pinned in 'running' forever, so a claim older than STALE_CLAIM_MS is
+  // handed back to the queue.
+  const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
   const due = await db.all<any>(
     `SELECT j.*, p.name AS product_name, p.fuel_type, p.status AS product_status,
             b.name AS brand_name
        FROM ai_spec_jobs j
        JOIN products p ON p.id = j.product_id
        JOIN brands b ON b.id = p.brand_id
-      WHERE j.status IN ('queued', 'deferred') AND j.next_run_at <= ?
+      WHERE j.next_run_at <= ?
+        AND (   j.status IN ('queued', 'deferred')
+             OR (j.status = 'running' AND COALESCE(j.started_at, j.updated_at) < ?) )
       ORDER BY j.attempts, j.created_at
       LIMIT ${Math.trunc(maxJobs * 3)}`,
-    [nowIso()],
+    [nowIso(), staleBefore],
   );
 
   for (const job of due) {
@@ -220,8 +281,10 @@ export async function runQueue(opts: {
     await db.run(
       `UPDATE ai_spec_jobs SET status = 'running', claim_token = ?, started_at = ?,
               attempts = attempts + 1, updated_at = ?
-        WHERE id = ? AND status IN ('queued', 'deferred') AND next_run_at <= ?`,
-      [token, nowIso(), nowIso(), job.id, nowIso()],
+        WHERE id = ? AND next_run_at <= ?
+        AND (   status IN ('queued', 'deferred')
+             OR (status = 'running' AND COALESCE(started_at, updated_at) < ?))`,
+      [token, nowIso(), nowIso(), job.id, nowIso(), staleBefore],
     );
     const owned = await db.get<any>(`SELECT claim_token FROM ai_spec_jobs WHERE id = ?`, [job.id]);
     if (owned?.claim_token !== token) continue; // lost the race, another caller has it
@@ -340,8 +403,11 @@ export async function revertJob(jobId: string): Promise<{ product_id: string | n
     `SELECT id, product_id, status, filled_keys FROM ai_spec_jobs WHERE id = ?`, [jobId],
   );
   if (!job) return { product_id: null, reverted: 0 };
-  const keys: string[] = (() => { try { return JSON.parse(job.filled_keys || '[]'); } catch { return []; } })()
-    .filter((k) => typeof k === 'string');
+  const rawKeys: unknown = (() => {
+    try { const parsed = JSON.parse(job.filled_keys || '[]'); return Array.isArray(parsed) ? parsed : []; }
+    catch { return []; }
+  })();
+  const keys: string[] = (rawKeys as unknown[]).filter((k): k is string => typeof k === 'string');
   if (!keys.length) return { product_id: job.product_id, reverted: 0 };
 
   const product = await db.get<any>(`SELECT id, fuel_type FROM products WHERE id = ?`, [job.product_id]);

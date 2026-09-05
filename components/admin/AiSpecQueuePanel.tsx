@@ -13,6 +13,24 @@ type Job = {
   product_name: string; brand_name: string; product_status: string; fuel_type: string | null;
 };
 
+/**
+ * Render server ISO timestamps as fixed UTC text.
+ *
+ * Deliberately not `toLocaleString('en-IN')`: the browser is IST and the server
+ * runs UTC, so the server HTML and the client render disagree and React reports a
+ * hydration mismatch on a page an admin is trying to read. Same reason to avoid
+ * `new Date()` at render time.
+ */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function utc(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
+}
+
 const TONE: Record<string, string> = {
   applied: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   deferred: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -61,7 +79,7 @@ export function AiSpecQueuePanel({
     if (json?.ok) { setSummary(json.data.summary); setJobs(json.data.jobs); }
   }
 
-  const running = busy !== null;
+  const busyNow = busy !== null;
   const stats = [
     { label: 'Queued', value: summary.queued },
     { label: 'Waiting on AI quota', value: summary.deferred },
@@ -83,23 +101,23 @@ export function AiSpecQueuePanel({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button disabled={running} onClick={() => call({ action: 'enqueue', statuses: includeDrafts ? ['published', 'draft'] : ['published'] }, 'scan')}>
-          {running === 'scan' ? 'Scanning…' : 'Scan catalogue for gaps'}
+        <Button disabled={busyNow} onClick={() => call({ action: 'enqueue', statuses: includeDrafts ? ['published', 'draft'] : ['published'] }, 'scan')}>
+          {busy === 'scan' ? 'Scanning…' : 'Scan catalogue for gaps'}
         </Button>
-        <Button disabled={running} onClick={() => call({ action: 'run', maxJobs: 3, budgetMs: 45000 }, 'run')}>
-          {running === 'run' ? 'Running batch…' : 'Run next batch (3 models)'}
+        <Button disabled={busyNow} onClick={() => call({ action: 'run', maxJobs: 3, budgetMs: 45000 }, 'run')}>
+          {busy === 'run' ? 'Running batch…' : 'Run next batch (3 models)'}
         </Button>
-        <Button disabled={running} onClick={() => call({ action: 'run', maxJobs: 10, budgetMs: 110000 }, 'run10')}>
-          {running === 'run10' ? 'Running…' : 'Run larger batch (10)'}
+        <Button disabled={busyNow} onClick={() => call({ action: 'run', maxJobs: 10, budgetMs: 110000 }, 'run10')}>
+          {busy === 'run10' ? 'Running…' : 'Run larger batch (10)'}
         </Button>
-        <Button disabled={running} onClick={() => call({ action: 'retry-now' }, 'retry')}>
-          {running === 'retry' ? 'Forcing…' : 'Force deferred jobs now'}
+        <Button disabled={busyNow} onClick={() => call({ action: 'retry-now' }, 'retry')}>
+          {busy === 'retry' ? 'Forcing…' : 'Force deferred jobs now'}
         </Button>
-        <Button disabled={running || summary.applied === 0} onClick={() => call({ action: 'revert', ids: jobs.filter((j) => j.status === 'applied').map((j) => j.id).join(',') }, 'revert')}>
-          {running === 'revert' ? 'Reverting…' : 'Undo last AI values (all applied)'}
+        <Button disabled={busyNow || summary.applied === 0} onClick={() => call({ action: 'revert', ids: jobs.filter((j) => j.status === 'applied').map((j) => j.id).join(',') }, 'revert')}>
+          {busy === 'revert' ? 'Reverting…' : 'Undo last AI values (all applied)'}
         </Button>
-        <Button disabled={running} onClick={() => call({ action: 'clear-finished' }, 'clear')}>
-          {running === 'clear' ? 'Clearing…' : 'Clear finished jobs'}
+        <Button disabled={busyNow} onClick={() => call({ action: 'clear-finished' }, 'clear')}>
+          {busy === 'clear' ? 'Clearing…' : 'Clear finished jobs'}
         </Button>
         <a
           href="/api/admin/export/spec-sheet?status=all&onlygaps=0"
@@ -120,7 +138,7 @@ export function AiSpecQueuePanel({
       {summary.nextRetryAt && summary.deferred > 0 && (
         <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-800">
           {summary.deferred} job(s) are throttled by the AI provider and will retry automatically
-          {summary.nextRetryAt ? ` — next attempt ${new Date(summary.nextRetryAt).toLocaleString('en-IN')}` : ''}.
+          {summary.nextRetryAt ? ` — next attempt ${utc(summary.nextRetryAt)}` : ''}.
           Adding another Gemini key (GEMINI_API_KEY_2) shortens this.
         </p>
       )}
@@ -161,7 +179,7 @@ export function AiSpecQueuePanel({
                   {j.suggested_keys && <KeyList json={j.suggested_keys} label="held for review" tone="text-warn" />}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-ink-mute">
-                  {['queued', 'deferred'].includes(j.status) && j.next_run_at ? new Date(j.next_run_at).toLocaleString('en-IN') : '—'}
+                  {['queued', 'deferred'].includes(j.status) ? utc(j.next_run_at) : '—'}
                 </td>
                 <td className="max-w-[28rem] px-3 py-2 text-[11.5px] text-ink-mute">{j.last_error || ''}</td>
               </tr>
