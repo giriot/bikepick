@@ -37,6 +37,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       { href: '/admin', label: 'Dashboard' },
       { href: '/admin/revenue', label: 'Revenue' },
       { href: '/admin/analytics', label: 'Analytics' },
+      { href: '/admin/ai-spec-queue', label: 'AI spec queue' },
     ] },
     ...ADMIN_GROUPS.map((g) => ({
       group: g,

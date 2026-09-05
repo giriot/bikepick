@@ -1,0 +1,346 @@
+/**
+ * AI specification-fill queue.
+ * ---------------------------------------------------------------------------
+ * Drives `generateBikeTemplate()` over many models without losing work when
+ * the AI provider refuses to answer. That matters because the Gemini keys on
+ * this project are on a free tier that returns 429 for hours at a time, and an
+ * in-request loop would simply drop every model after the first refusal.
+ *
+ * So every model gets a row in `ai_spec_jobs` and the queue is *resumable*:
+ *
+ *   queued -> running -> applied
+ *                    \-> deferred   (quota exceeded: retry after a backoff)
+ *                    \-> failed     (kept failing after max_attempts)
+ *
+ * A quota error is NOT counted as a real failure — the row keeps its attempt
+ * budget for genuine problems and is rescheduled with exponential backoff, so a
+ * later invocation (the daily cron tick, or someone opening this page) picks it
+ * up once the quota window has reset.
+ *
+ * Safety rules, matching the project's standing policy:
+ *   - AI values only ever fill fields that are currently NULL. Curated data is
+ *     never overwritten, so a bad model answer cannot destroy a checked figure.
+ *   - every applied value is recorded (which keys, what was there before) and
+ *     audited, so a batch is reversible and attributable.
+ *   - the draft is still labelled AI-derived and unverified; the admin page
+ *     shows that so nobody mistakes it for OEM-checked data.
+ */
+import 'server-only';
+import { db, insert, nowIso, uid } from './db';
+import { generateBikeTemplate } from './ai-template';
+import {
+  BIKE_SPEC_KEYS, EV_SPEC_KEYS, NUMERIC_BIKE, BOOL_BIKE, NUMERIC_EV, BOOL_EV,
+} from './spec-fields';
+
+/** Anything matching this is a rate/quota refusal, not a real error. */
+const QUOTA_ERROR = /429|quota|exhausted|rate.?limit|RESOURCE_EXHAUSTED|credits|too many requests/i;
+
+/** Default work per invocation, in ms. Keeps a batch inside the function limit. */
+const DEFAULT_BUDGET_MS = 50_000;
+const DEFAULT_MAX_JOBS = 3;
+const MAX_BACKOFF_MINUTES = 720; // 12h — a free tier can stay throttled all day
+
+export type JobStatus = 'queued' | 'running' | 'applied' | 'deferred' | 'failed' | 'skipped';
+
+interface SpecTarget {
+  table: 'bike_specs' | 'ev_specs';
+  keys: readonly string[];
+  numeric: Set<string>;
+  bools: Set<string>;
+}
+
+function targetFor(fuelType?: string | null): SpecTarget {
+  return fuelType === 'electric'
+    ? { table: 'ev_specs', keys: EV_SPEC_KEYS, numeric: NUMERIC_EV, bools: BOOL_EV }
+    : { table: 'bike_specs', keys: BIKE_SPEC_KEYS, numeric: NUMERIC_BIKE, bools: BOOL_BIKE };
+}
+
+function minutesFromNow(mins: number): string {
+  return new Date(Date.now() + mins * 60_000).toISOString();
+}
+
+/** Exponential: 10m, 20m, 40m, 80m, 160m, 320m, 640m, 720m… */
+export function backoffMinutes(attempts: number): number {
+  return Math.min(10 * 2 ** Math.max(0, attempts - 1), MAX_BACKOFF_MINUTES);
+}
+
+/** Coerce one AI value into the column type. Unknown/blank stays null. */
+function coerce(value: unknown, key: string, t: SpecTarget): string | number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (t.bools.has(key)) {
+    if (typeof value === 'boolean') return value ? 1 : 0;
+    const s = String(value).trim().toLowerCase();
+    if (/^(yes|y|true|1|available|yes \(std\))/.test(s)) return 1;
+    if (/^(no|n|false|0|not available|absent)$/.test(s)) return 0;
+    return null;
+  }
+  if (t.numeric.has(key)) {
+    const n = Number(String(value).replace(/[^\d.\-]/g, ''));
+    return Number.isFinite(n) ? n : null;
+  }
+  const s = String(value).trim();
+  if (!s || /^(n\/a|na|not recorded|not available|unknown|—|-)$/.test(s.toLowerCase())) return null;
+  return s.slice(0, 500);
+}
+
+/** Count NULL spec fields on the model-level row (variant_id IS NULL). */
+async function missingFields(productId: string, fuelType: string | null): Promise<string[]> {
+  const t = targetFor(fuelType);
+  const row = await db.get<any>(
+    `SELECT * FROM ${t.table} WHERE product_id = ? AND variant_id IS NULL`, [productId],
+  );
+  return t.keys.filter((k) => row?.[k] === null || row?.[k] === undefined);
+}
+
+export interface EnqueueResult {
+  created: number; reset: number; already_queued: number; complete: number; considered: number;
+}
+
+/**
+ * Queue every model whose spec sheet still has holes.
+ * Idempotent: an existing non-terminal job for the same product is left alone,
+ * a finished one (applied/failed/skipped) is reset so a new pass can run.
+ */
+export async function enqueueModels(opts: {
+  statuses?: string[];
+  limit?: number;
+  skipComplete?: boolean;
+  userId?: string | null;
+} = {}): Promise<EnqueueResult> {
+  const statuses = opts.statuses?.length ? opts.statuses : ['published'];
+  const limit = Math.max(1, Math.min(Number(opts.limit) || 200, 500));
+  const skipComplete = opts.skipComplete !== false;
+  const res: EnqueueResult = { created: 0, reset: 0, already_queued: 0, complete: 0, considered: 0 };
+
+  const placeholders = statuses.map(() => '?').join(',');
+  const models = await db.all<any>(
+    `SELECT p.id, p.fuel_type FROM products p
+      WHERE p.deleted_at IS NULL AND p.status IN (${placeholders})
+      ORDER BY p.brand_id, p.name LIMIT ${Math.trunc(limit)}`,
+    statuses,
+  );
+
+  for (const m of models) {
+    res.considered++;
+    const missing = await missingFields(m.id, m.fuel_type);
+    const existing = await db.get<any>(`SELECT id, status FROM ai_spec_jobs WHERE product_id = ?`, [m.id]);
+
+    if (existing) {
+      if (['applied', 'failed', 'skipped'].includes(existing.status)) {
+        if (!missing.length && skipComplete) { res.complete++; continue; }
+        await db.run(
+          `UPDATE ai_spec_jobs SET status = 'queued', attempts = 0, next_run_at = ?, last_error = NULL,
+                  finished_at = NULL, claim_token = NULL, missing_before = ?, updated_at = ?
+             WHERE id = ?`,
+          [nowIso(), missing.length, nowIso(), existing.id],
+        );
+        res.reset++;
+      } else {
+        res.already_queued++;
+      }
+      continue;
+    }
+
+    if (!missing.length && skipComplete) { res.complete++; continue; }
+    await insert('ai_spec_jobs', {
+      id: uid('asj'),
+      product_id: m.id,
+      status: 'queued',
+      attempts: 0,
+      max_attempts: 8,
+      next_run_at: nowIso(),
+      missing_before: missing.length,
+      requested_by: opts.userId ?? null,
+    });
+    res.created++;
+  }
+  return res;
+}
+
+export interface BatchResult {
+  ran: number; applied: number; deferred: number; failed: number; skipped: number;
+  quotaLimited: boolean; stoppedBy: 'budget' | 'empty' | 'max_jobs'; remaining: number;
+  details: { product: string; outcome: string; fields: number; note?: string }[];
+}
+
+/**
+ * Process jobs that are due, for at most `budgetMs`. Call it from the admin
+ * page (a button) or from the cron route; both share the same claim logic, so
+ * two callers cannot apply the same model twice.
+ */
+export async function runQueue(opts: {
+  budgetMs?: number; maxJobs?: number; userId?: string | null;
+} = {}): Promise<BatchResult> {
+  const budgetMs = Math.max(3_000, Math.min(Number(opts.budgetMs) || DEFAULT_BUDGET_MS, 120_000));
+  const maxJobs = Math.max(1, Math.min(Number(opts.maxJobs) || DEFAULT_MAX_JOBS, 12));
+  const started = Date.now();
+  const out: BatchResult = {
+    ran: 0, applied: 0, deferred: 0, failed: 0, skipped: 0,
+    quotaLimited: false, stoppedBy: 'empty', remaining: 0, details: [],
+  };
+
+  const due = await db.all<any>(
+    `SELECT j.*, p.name AS product_name, p.fuel_type, p.status AS product_status,
+            b.name AS brand_name
+       FROM ai_spec_jobs j
+       JOIN products p ON p.id = j.product_id
+       JOIN brands b ON b.id = p.brand_id
+      WHERE j.status IN ('queued', 'deferred') AND j.next_run_at <= ?
+      ORDER BY j.attempts, j.created_at
+      LIMIT ${Math.trunc(maxJobs * 3)}`,
+    [nowIso()],
+  );
+
+  for (const job of due) {
+    if (out.ran >= maxJobs) { out.stoppedBy = 'max_jobs'; break; }
+    if (Date.now() - started > budgetMs) { out.stoppedBy = 'budget'; break; }
+
+    // Claim: only one caller can move the row into 'running' with our token.
+    const token = uid('claim');
+    await db.run(
+      `UPDATE ai_spec_jobs SET status = 'running', claim_token = ?, started_at = ?,
+              attempts = attempts + 1, updated_at = ?
+        WHERE id = ? AND status IN ('queued', 'deferred') AND next_run_at <= ?`,
+      [token, nowIso(), nowIso(), job.id, nowIso()],
+    );
+    const owned = await db.get<any>(`SELECT claim_token FROM ai_spec_jobs WHERE id = ?`, [job.id]);
+    if (owned?.claim_token !== token) continue; // lost the race, another caller has it
+
+    out.ran++;
+    const label = `${job.brand_name} ${job.product_name}`;
+    try {
+      const draft = await generateBikeTemplate(job.brand_name, job.product_name, job.fuel_type);
+      const applied = await applySpecs(job.product_id, job.fuel_type, draft.specs);
+
+      if (!applied.filled.length) {
+        // AI answered but offered nothing we were allowed to write.
+        await db.run(
+          `UPDATE ai_spec_jobs SET status = 'skipped', claim_token = NULL, finished_at = ?,
+                  last_error = NULL, updated_at = ? WHERE id = ?`,
+          [nowIso(), nowIso(), job.id],
+        );
+        out.skipped++;
+        out.details.push({ product: label, outcome: 'skipped', fields: 0, note: 'no new values offered' });
+        continue;
+      }
+
+      await db.run(
+        `UPDATE ai_spec_jobs SET status = 'applied', claim_token = NULL, finished_at = ?,
+                provider = ?, fields_filled = ?, filled_keys = ?, previous_values = ?,
+                last_error = NULL, updated_at = ? WHERE id = ?`,
+        [
+          nowIso(), draft.provider ?? null, applied.filled.length,
+          JSON.stringify(applied.filled), JSON.stringify(applied.previous),
+          nowIso(), job.id,
+        ],
+      );
+      // Keep the model's updated_at in step so sitemap lastMod and the admin
+      // "last touched" column reflect the change.
+      await db.run('UPDATE products SET updated_at = ? WHERE id = ?', [nowIso(), job.product_id]);
+
+      out.applied++;
+      out.details.push({ product: label, outcome: 'applied', fields: applied.filled.length, note: draft.warnings?.length ? `${draft.warnings.length} warning(s)` : undefined });
+      await logApply(opts.userId ?? null, job, label, applied);
+    } catch (e) {
+      const message = (e instanceof Error ? e.message : String(e)).slice(0, 900);
+      const quota = QUOTA_ERROR.test(message);
+      const attempts = Number(job.attempts || 0) + 1;
+      const exhausted = attempts >= Number(job.max_attempts || 8);
+      const status: JobStatus = quota && !exhausted ? 'deferred' : 'failed';
+      const wait = quota ? backoffMinutes(attempts) : backoffMinutes(attempts);
+
+      await db.run(
+        `UPDATE ai_spec_jobs SET status = ?, claim_token = NULL, next_run_at = ?,
+                last_error = ?, updated_at = ? WHERE id = ?`,
+        [status, minutesFromNow(wait), message, nowIso(), job.id],
+      );
+      if (quota) { out.quotaLimited = true; out.deferred++; } else { out.failed++; }
+      out.details.push({
+        product: label, outcome: status, fields: 0,
+        note: `${quota ? 'AI quota exceeded — retrying in ' + wait + 'm' : message}${exhausted ? ' (giving up)' : ''}`,
+      });
+    }
+  }
+
+  out.remaining = await countDue();
+  if (out.ran === 0) out.stoppedBy = 'empty';
+  else if (out.stoppedBy === 'empty') out.stoppedBy = out.remaining > 0 ? 'budget' : 'empty';
+  return out;
+}
+
+/** Write AI values into the spec row, but only where it is currently empty. */
+async function applySpecs(
+  productId: string, fuelType: string | null, specs: Record<string, any>,
+): Promise<{ filled: string[]; previous: Record<string, unknown> }> {
+  const t = targetFor(fuelType);
+  const row = await db.get<any>(
+    `SELECT * FROM ${t.table} WHERE product_id = ? AND variant_id IS NULL`, [productId],
+  );
+
+  const toSet: Record<string, string | number> = {};
+  const previous: Record<string, unknown> = {};
+  for (const key of t.keys) {
+    const current = row?.[key];
+    if (current !== null && current !== undefined) continue; // never overwrite curated data
+    const value = coerce(specs?.[key], key, t);
+    if (value === null) continue;
+    toSet[key] = value;
+    previous[key] = null;
+  }
+  if (!Object.keys(toSet).length) return { filled: [], previous };
+
+  const keys = Object.keys(toSet);
+  if (!row) {
+    await insert(t.table, { id: uid('spc'), product_id: productId, variant_id: null, ...toSet });
+  } else {
+    await db.run(
+      `UPDATE ${t.table} SET ${keys.map((k) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`,
+      [...keys.map((k) => toSet[k]), nowIso(), row.id],
+    );
+  }
+  return { filled: keys, previous };
+}
+
+async function logApply(userId: string | null, job: any, label: string, applied: { filled: string[] }) {
+  // Audit best-effort: a logging failure must never abort a spec update.
+  try {
+    await insert('audit_logs', {
+      id: uid('aud'),
+      actor_id: userId, actor_email: null, actor_role: userId ? null : 'system',
+      action: 'ai_spec.fill', entity_type: 'product', entity_id: job.product_id,
+      detail: JSON.stringify({ model: label, fields: applied.filled, source: 'ai_template_queue' }).slice(0, 4000),
+      ip: null,
+    });
+  } catch { /* ignore */ }
+}
+
+async function countDue(): Promise<number> {
+  const r = await db.get<any>(
+    `SELECT COUNT(*) AS c FROM ai_spec_jobs WHERE status IN ('queued','deferred') AND next_run_at <= ?`,
+    [nowIso()],
+  );
+  return Number(r?.c ?? 0);
+}
+
+export interface QueueSummary {
+  queued: number; deferred: number; running: number; applied: number; failed: number; skipped: number;
+  dueNow: number; fieldsFilled: number; nextRetryAt: string | null; lastError: string | null;
+}
+
+export async function queueSummary(): Promise<QueueSummary> {
+  const rows = await db.all<any>(`SELECT status, COUNT(*) AS c, COALESCE(SUM(fields_filled),0) AS f FROM ai_spec_jobs GROUP BY status`);
+  const by = new Map(rows.map((r) => [r.status, r]));
+  const next = await db.get<any>(
+    `SELECT next_run_at, last_error FROM ai_spec_jobs
+      WHERE status IN ('queued','deferred') ORDER BY next_run_at LIMIT 1`,
+  );
+  const get = (s: JobStatus) => Number(by.get(s)?.c ?? 0);
+  return {
+    queued: get('queued'), deferred: get('deferred'), running: get('running'),
+    applied: get('applied'), failed: get('failed'), skipped: get('skipped'),
+    dueNow: await countDue(),
+    fieldsFilled: Number(by.get('applied')?.f ?? 0),
+    nextRetryAt: next?.next_run_at ?? null,
+    lastError: next?.last_error ?? null,
+  };
+}
