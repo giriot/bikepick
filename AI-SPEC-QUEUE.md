@@ -121,12 +121,15 @@ spreadsheet can add models as well as fill them:
   it when the number came from somewhere else.
 * New brands are created automatically; new models land as **draft** unless you set
   `status` to `published`, so nothing goes live without you choosing it.
-* 65 of the 77 columns are real spec fields and 58 of those are importable. These
-  seven are read-only in the sheet and are ignored on import:
-  `service_interval_km`, `est_service_cost`, `accessories`, `range_basis`,
-  `fast_charge_time_min`, `running_cost_per_km`, `est_battery_replacement_cost`.
-  Six of them are the figures the AI queue also refuses to write, so they belong in
-  the product form (`/admin/products/<id>/specs`) where a person enters them.
+* All 65 spec columns in the sheet are importable, including `service_interval_km`,
+  `est_service_cost`, `accessories`, `range_basis`, `fast_charge_time_min`,
+  `running_cost_per_km` and `est_battery_replacement_cost`. The importer writes a
+  column only when its cell is filled, so blank cells in an edited sheet never wipe
+  what is already stored, and re-importing an unedited file reports every row as
+  unchanged.
+* Those seven are still never written by the AI queue: they are estimates, so a
+  person has to put them in — whether in the product form
+  (`/admin/products/<id>/specs`) or in the sheet.
 * `slug`, `verification_status`, `missing_count` and `missing_fields` are listed by
   the importer as `unknownColumns` and ignored — they are there for you, not for the
   database.

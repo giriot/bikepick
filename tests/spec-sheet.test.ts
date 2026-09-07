@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getImportType } from '@/lib/import-schema';
-import {
-  specSheetHeader, specSheetKeys, SPEC_SHEET_SOURCE, SPEC_SHEET_SHEET_ONLY, SPEC_SHEET_IMPORT_IGNORED,
-} from '@/lib/spec-sheet';
+import { specSheetHeader, specSheetKeys, SPEC_SHEET_SOURCE, SPEC_SHEET_SHEET_ONLY } from '@/lib/spec-sheet';
 
 /**
  * The spec sheet is only worth keeping if an edited copy can go straight back
@@ -35,18 +33,20 @@ describe('spec sheet <-> bulk importer round trip', () => {
     expect(header[header.indexOf('source_name')]).toBe('source_name');
   });
 
-  it('only leaves the documented columns for the importer to ignore', () => {
+  it('leaves nothing but its two helper columns for the importer to ignore', () => {
     const unknown = header.filter((h) => !known.has(h));
     const sheetOnly = new Set<string>([...SPEC_SHEET_SHEET_ONLY, 'slug', 'verification_status']);
-    const dropped = unknown.filter((h) => !sheetOnly.has(h));
-    expect(dropped.sort()).toEqual([...SPEC_SHEET_IMPORT_IGNORED].sort());
+    expect(unknown.filter((h) => !sheetOnly.has(h))).toEqual([]);
   });
 
-  it('keeps almost every spec field importable', () => {
-    const importable = specSheetKeys().filter((k) => known.has(k));
-    expect(importable.length).toBeGreaterThanOrEqual(specSheetKeys().length - SPEC_SHEET_IMPORT_IGNORED.length);
-    expect(importable).toContain('mileage_kmpl');
-    expect(importable).toContain('real_world_range_km');
+  it('makes every spec column importable, including the estimated-cost ones', () => {
+    const importable = new Set(specSheetKeys().filter((k) => known.has(k)));
+    expect(importable.size).toBe(specSheetKeys().length);
+    for (const k of ['mileage_kmpl', 'real_world_range_km', 'service_interval_km', 'est_service_cost',
+                     'accessories', 'range_basis', 'fast_charge_time_min', 'running_cost_per_km',
+                     'est_battery_replacement_cost']) {
+      expect(importable, `"${k}" must be declared in the importer schema`).toContain(k);
+    }
   });
 
   it('lists every id column before the spec block, so the sheet opens sensibly', () => {
