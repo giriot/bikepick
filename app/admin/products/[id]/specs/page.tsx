@@ -42,7 +42,9 @@ export default async function ProductSpecsPage({ params }: { params: { id: strin
       <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-mute">
         Fill this from the <b>AI template</b> (top orange box — needs only the brand &amp; model name; drafts the full spec,
         variants, comparison and pros &amp; cons) or the dropdown form below. You review and save every value — nothing is
-        published automatically. Blank fields are stored as &ldquo;not recorded&rdquo; and shown as <b>N/A</b> on the site.
+        published automatically. Blank fields are stored as &ldquo;not recorded&rdquo; and <b>left off the public sheet
+        entirely</b> &mdash; the page shows only rows that hold a value, so an empty field looks like an absent one rather than an
+        &ldquo;N/A&rdquo;; a recorded <b>0</b> or <b>No</b> is displayed as an answer.
       </p>
       <div className="mt-5">
         <SpecSheetPage

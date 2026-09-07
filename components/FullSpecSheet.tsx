@@ -1,10 +1,12 @@
-import { num, yesNo } from '@/lib/format';
+import { inr, num, yesNo } from '@/lib/format';
 
 /**
  * Full specification sheet for a model — grouped, label/value, rendered from
  * the model-level spec row (bike_specs / ev_specs). Only rows with a recorded
- * value are shown; everything else is omitted rather than guessed. Figures are
- * as published by the manufacturer.
+ * value are shown — blanks are OMITTED, not printed as "N/A" — so a visitor
+ * never reads an absent field as a zero. Figures are as published by the
+ * manufacturer, and every column the admin forms and the spec sheet CSV can fill
+ * must have a row here, otherwise recorded data would be invisible.
  */
 type Row = { label: string; value: string | null };
 
@@ -47,6 +49,7 @@ export function FullSpecSheet({ bike, ev, isEv }: { bike: any; ev: any; isEv: bo
             { label: 'Battery type', value: t(s.battery_chemistry) },
             { label: 'Claimed range', value: n(s.claimed_range_km, 'km') },
             { label: 'Real-world range (our estimate)', value: n(s.real_world_range_km, 'km') },
+            { label: 'Range basis', value: t(s.range_basis) },
           ],
         },
         {
@@ -136,6 +139,8 @@ export function FullSpecSheet({ bike, ev, isEv }: { bike: any; ev: any; isEv: bo
             { label: 'Keyless start', value: y(s.keyless_start) },
             { label: 'Cruise control', value: y(s.cruise_control) },
             { label: 'Traction control', value: y(s.traction_control) },
+            { label: 'Hill hold assist', value: y(s.hill_hold) },
+            { label: 'Reverse assist', value: y(s.reverse_mode) },
           ],
         },
         {
@@ -143,7 +148,9 @@ export function FullSpecSheet({ bike, ev, isEv }: { bike: any; ev: any; isEv: bo
           rows: [
             { label: 'Warranty', value: t(s.warranty) },
             { label: 'Service interval', value: s.service_interval_km ? `Every ${s.service_interval_km} km` : null },
+            { label: 'Typical service cost', value: s.est_service_cost == null ? null : inr(s.est_service_cost) },
             { label: 'Colours', value: t(s.colours) },
+            { label: 'Accessories', value: t(s.accessories) },
           ],
         },
       ];
