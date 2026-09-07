@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { requirePermission } from '@/lib/rbac';
 import { handleError, fail } from '@/lib/api';
+import { specSheetHeader, specSheetKeys, SPEC_SHEET_SOURCE } from '@/lib/spec-sheet';
 import { BIKE_SPEC_KEYS, EV_SPEC_KEYS } from '@/lib/spec-fields';
 
 export const dynamic = 'force-dynamic';
@@ -50,9 +51,8 @@ export async function GET(req: Request) {
       }
     }
 
-    const specKeys = [...BIKE_SPEC_KEYS, ...EV_SPEC_KEYS.filter((k) => !(BIKE_SPEC_KEYS as readonly string[]).includes(k))];
-    const header = ['brand', 'model', 'slug', 'status', 'fuel_type', 'model_year', 'price_min', 'price_max',
-                    'verification_status', 'missing_count', 'missing_fields', ...specKeys];
+    const specKeys = specSheetKeys();
+    const header = specSheetHeader();
 
     const onlyGaps = sp.get('onlygaps') === '1';
     const body: string[][] = [];
@@ -62,7 +62,7 @@ export async function GET(req: Request) {
       if (onlyGaps && !missing.length) continue;
       body.push([
         p.brand, p.name, p.slug, p.status, p.fuel_type ?? '', p.model_year ?? '',
-        p.price_min ?? '', p.price_max ?? '', p.verification_status ?? '',
+        p.price_min ?? '', p.price_max ?? '', p.verification_status ?? '', SPEC_SHEET_SOURCE,
         String(missing.length), missing.join('|'),
         ...specKeys.map((k) => spec[k] ?? ''),
       ]);

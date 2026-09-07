@@ -107,3 +107,28 @@ open in a spreadsheet.
 * **A batch that dies half-way does not strand the queue.** A job pinned in
   `running` (function killed, redeploy mid-run) becomes claimable again after 10
   minutes, along with anything `queued` or `deferred` that is due.
+
+## Adding or editing bikes from the sheet
+
+The single sheet is designed to go **back into** `/admin/import` after editing, so a
+spreadsheet can add models as well as fill them:
+
+* The header starts with every column the importer requires (`brand`, `name`,
+  `fuel_type`, `source_name`) and uses the importer's exact column names. `name`,
+  not `model`, because rows are matched on **brand + name** — re-importing an edited
+  file updates the model instead of duplicating it. `source_name` is filled with
+  `bikepick.in spec sheet export` so re-imported figures keep their provenance; edit
+  it when the number came from somewhere else.
+* New brands are created automatically; new models land as **draft** unless you set
+  `status` to `published`, so nothing goes live without you choosing it.
+* 65 of the 77 columns are real spec fields and 58 of those are importable. These
+  seven are read-only in the sheet and are ignored on import:
+  `service_interval_km`, `est_service_cost`, `accessories`, `range_basis`,
+  `fast_charge_time_min`, `running_cost_per_km`, `est_battery_replacement_cost`.
+  Six of them are the figures the AI queue also refuses to write, so they belong in
+  the product form (`/admin/products/<id>/specs`) where a person enters them.
+* `slug`, `verification_status`, `missing_count` and `missing_fields` are listed by
+  the importer as `unknownColumns` and ignored — they are there for you, not for the
+  database.
+* Models with a status other than `draft`/`published` (e.g. `archived`) are reported
+  as a per-row error rather than being silently rewritten to a valid status.
