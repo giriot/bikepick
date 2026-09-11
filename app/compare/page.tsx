@@ -5,7 +5,7 @@ import { getCompareEntities, listProducts } from '@/lib/queries';
 import { buildComparison } from '@/lib/compare';
 import { computeScore, DEFAULT_WEIGHTS, explainWin, type ScoreWeights } from '@/lib/score';
 import { getJsonSetting } from '@/lib/settings';
-import { inr } from '@/lib/format';
+import { inr, parseProductIds } from '@/lib/format';
 import { buildMetadata, breadcrumbJsonLd, JsonLd } from '@/lib/seo';
 import { Breadcrumbs, Empty, Notice, ScoreRing, SectionHeader } from '@/components/ui';
 import { CompareToggle } from '@/components/CompareToggle';
@@ -59,7 +59,8 @@ export default async function ComparePage({ searchParams }: { searchParams: { id
           <SectionHeader title="Popular comparisons" subtitle="Ready-made comparisons from our editorial team." />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {saved.map((c) => {
-              const pids = JSON.parse(c.product_ids) as string[];
+              const pids = parseProductIds(c.product_ids);
+              if (pids.length < 2) return null;
               return (
                 <Link key={c.id} href={`/compare?ids=${pids.join(',')}`} className="card card-hover p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">{pids.length}-way</p>

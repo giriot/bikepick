@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { db } from '@/lib/db';
+import { parseProductIds } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,8 +9,7 @@ export default async function SavedComparison({ params }: { params: { slug: stri
   const row = await db.get<any>('SELECT * FROM comparisons WHERE slug = ?', [params.slug]);
   if (!row) notFound();
   await db.run('UPDATE comparisons SET view_count = view_count + 1 WHERE id = ?', [row.id]);
-  let ids = '';
-  try { ids = (JSON.parse(row.product_ids) as string[]).join(','); } catch { /* corrupt row — fall through */ }
+  const ids = parseProductIds(row.product_ids).join(',');
   if (!ids) notFound();
   redirect(`/compare?ids=${ids}`);
 }

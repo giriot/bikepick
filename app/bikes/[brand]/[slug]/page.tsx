@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { getJsonSetting } from '@/lib/settings';
 import { computeScore, DEFAULT_WEIGHTS, type ScoreWeights } from '@/lib/score';
 import { runningCostPerKm } from '@/lib/compare';
+import { projectResale } from '@/lib/calculators';
 import { inr, num, yesNo, dateIn, relative, toStrArray } from '@/lib/format';
 import { buildMetadata, breadcrumbJsonLd, productJsonLd, JsonLd } from '@/lib/seo';
 import { Breadcrumbs, Notice, ScoreRing, SectionHeader, TrustBadge } from '@/components/ui';
@@ -88,6 +89,16 @@ export default async function ProductPage({ params, searchParams }: Params) {
 
   const entity = { id: product.id, name: product.name, brand: product.brand_name, slug: product.slug, brandSlug: product.brand_slug, image: null, price: product.price_min, fuelType: product.fuel_type, score: scored.total, bike, ev };
   const costPerKm = runningCostPerKm(entity as any);
+  // Estimated value after 5 years + month-by-month depreciation curve (unique, not a repeated spec).
+  const resaleCurve = product.price_min != null ? projectResale(product.price_min, 5) : null;
+  const resale5 = resaleCurve ? resaleCurve[resaleCurve.length - 1] : null;
+  const retention5 = resale5 && product.price_min ? Math.round((resale5.value / product.price_min) * 100) : null;
+  const monthlyKm = 800; // typical Indian two-wheeler monthly usage, used only for the "est. monthly" figure
+  const lost5 = resale5 && product.price_min ? product.price_min - resale5.value : null;
+  const lostPerYear = lost5 != null ? Math.round(lost5 / 5) : null;
+  const RING_R = 34;
+  const RING_C = 2 * Math.PI * RING_R;
+  const ringOffset = retention5 != null ? RING_C * (1 - retention5 / 100) : RING_C;
 
   const [similar, usedOfModel, accessories] = await Promise.all([
     listProducts({ category: base, minPrice: (product.price_min || 0) * 0.7, maxPrice: (product.price_min || 0) * 1.35, perPage: 5 }),
@@ -136,19 +147,10 @@ export default async function ProductPage({ params, searchParams }: Params) {
               productName={product.name}
             />
 
-            {/* Below the gallery (user-directed): Cost per km → Similar models
-                → Pros & cons → Suitable for */}
+            {/* Below the gallery: editorial highlights only (no repeated specs) —
+                Similar models → Pros & cons → Suitable for. Value & running-cost
+                numbers live in the dedicated panel next to the price. */}
             <div className="mt-5 space-y-4">
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3.5 py-2.5">
-                <p className="text-[12.5px] font-semibold">
-                  Cost per km <span className="font-normal text-ink-mute">(energy only, {isEv ? 'electricity' : 'fuel'})</span>
-                </p>
-                <p className="whitespace-nowrap text-[15px] font-bold">
-                  {costPerKm ? `₹${costPerKm.toFixed(2)}` : '—'}
-                  <span className="ml-1.5 text-[10.5px] font-normal text-ink-mute">estimate</span>
-                </p>
-              </div>
-
               <div>
                 <h3 className="text-[13.5px] font-semibold">Similar models</h3>
                 <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-white">
@@ -300,28 +302,84 @@ export default async function ProductPage({ params, searchParams }: Params) {
               )}
             </section>
 
-            {/* Key specs */}
-            <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {(isEv
-                ? [
-                    ['Claimed range', num(ev?.claimed_range_km, 'km')],
-                    ['Our estimate', num(ev?.real_world_range_km, 'km')],
-                    ['Battery', num(ev?.battery_capacity_kwh, 'kWh')],
-                    ['Top speed', num(ev?.top_speed_kmph, 'km/h')],
-                  ]
-                : [
-                    ['Engine', num(bike?.engine_capacity_cc, 'cc')],
-                    ['Power', num(bike?.max_power_bhp, 'bhp')],
-                    ['Mileage', num(bike?.mileage_kmpl, 'kmpl')],
-                    ['Kerb weight', num(bike?.kerb_weight_kg, 'kg')],
-                  ]
-              ).map(([k, v]) => (
-                <div key={k} className="rounded-xl border border-line p-3">
-                  <dt className="text-[10.5px] uppercase tracking-wide text-ink-mute">{k}</dt>
-                  <dd className="mt-0.5 text-[15px] font-semibold">{v}</dd>
+            {/* Smart value check — unique insight, no repeated specs */}
+            {product.price_min != null && (
+              <section className="mt-5 overflow-hidden rounded-2xl border border-line bg-white shadow-card animate-fade-up">
+                <div className="flex items-center justify-between gap-2 border-b border-line bg-surface/70 px-4 py-2.5">
+                  <h2 className="flex items-center gap-1.5 text-[11.5px] font-bold uppercase tracking-wide text-ink-soft">
+                    <span className="text-brand-500">✦</span> Smart value check
+                  </h2>
+                  <Link href={`/tools/ownership?a=${product.id}`} className="text-[11px] font-semibold text-brand-600 hover:underline">
+                    Full 5-year breakdown →
+                  </Link>
                 </div>
-              ))}
-            </dl>
+
+                <div className="p-4">
+                  {/* Ring gauge + headline numbers */}
+                  <div className="flex items-center gap-4">
+                    <svg width="86" height="86" viewBox="0 0 86 86" className="shrink-0" role="img" aria-label={`${retention5}% of price retained after 5 years`}>
+                      <circle cx="43" cy="43" r={RING_R} fill="none" stroke="#F6F8FB" strokeWidth="11" />
+                      <circle
+                        cx="43" cy="43" r={RING_R} fill="none" stroke="#F0620C" strokeWidth="11" strokeLinecap="round"
+                        strokeDasharray={RING_C} strokeDashoffset={ringOffset} transform="rotate(-90 43 43)"
+                      />
+                      <text x="43" y="41" textAnchor="middle" fontSize="16" fontWeight="800" fill="#0B1220">{retention5}%</text>
+                      <text x="43" y="55" textAnchor="middle" fontSize="8" fill="#6B7686">value kept</text>
+                    </svg>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] text-ink-mute">Estimated value after 5 years</p>
+                      <p className="text-[24px] font-extrabold leading-tight tracking-tight text-brand-600">{resale5 ? inr(resale5.value) : '—'}</p>
+                      <p className="text-[11px] text-ink-mute">
+                        vs <span className="font-semibold text-ink">{inr(product.price_min)}</span> ex-showroom today
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Smart read — one-line takeaway */}
+                  {retention5 != null && lostPerYear != null && (
+                    <div className="mt-3.5 rounded-lg bg-brand-50 px-3 py-2 text-[12px] leading-5 text-brand-800">
+                      <span className="font-bold">Smart read:</span> this {isEv ? 'scooter' : 'bike'} keeps about{' '}
+                      <span className="font-bold">{retention5}%</span> of its price in 5 years — depreciation of roughly{' '}
+                      <span className="font-bold">{inr(lostPerYear)}/yr</span>.
+                    </div>
+                  )}
+
+                  {/* Year-by-year depreciation */}
+                  <div className="mt-3.5 space-y-1.5">
+                    {resaleCurve?.map((p) => (
+                      <div key={p.year} className="flex items-center gap-2">
+                        <span className="w-6 shrink-0 text-[10px] font-medium text-ink-mute">Y{p.year}</span>
+                        <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-surface">
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-brand-400 to-brand-500"
+                            style={{ width: `${p.retainedPct}%` }}
+                          />
+                          <div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-brand-200 to-brand-300" style={{ width: `${p.retainedPct}%`, opacity: 0.25 }} />
+                        </div>
+                        <span className="w-14 shrink-0 text-right text-[10px] font-semibold tabular-nums">{inr(p.value, { compact: true })}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Running cost tiles */}
+                  <div className="mt-3.5 grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-surface px-3 py-2">
+                      <p className="text-[10px] text-ink-mute">{isEv ? '⚡ Cost/km (electricity)' : '⛽ Cost/km (fuel)'}</p>
+                      <p className="mt-0.5 text-[14px] font-bold">{costPerKm ? `₹${costPerKm.toFixed(2)}` : '—'}</p>
+                    </div>
+                    <div className="rounded-lg bg-surface px-3 py-2">
+                      <p className="text-[10px] text-ink-mute">📅 Est. monthly ({monthlyKm} km)</p>
+                      <p className="mt-0.5 text-[14px] font-bold">{costPerKm ? inr(Math.round(costPerKm * monthlyKm)) : '—'}</p>
+                    </div>
+                  </div>
+
+                  <p className="mt-2.5 text-[10px] leading-4 text-ink-mute">
+                    {isEv ? 'Assumes a healthy battery. ' : ''}Depreciation uses a standard two-wheeler curve and today&apos;s
+                    ex-showroom price — indicative only, not a guaranteed buyback.
+                  </p>
+                </div>
+              </section>
+            )}
 
             {/* Variants — side-by-side comparison table */}
             {variants.length > 0 && (

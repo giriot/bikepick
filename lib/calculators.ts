@@ -178,3 +178,164 @@ export function judgeAskingPrice(asking: number, v: ValuationResult): { verdict:
 }
 
 function round2(n: number) { return Math.round(n * 100) / 100; }
+
+/** One point on the depreciation curve. */
+export interface ResalePoint { year: number; value: number; retainedPct: number }
+
+/**
+ * Standard two-wheeler depreciation curve: ~18% in year one, then ~10% a year
+ * tapering to ~8% and ~6%. Value is rounded to the nearest ₹500. Indicative only —
+ * real resale depends on condition, kilometres, demand and paperwork.
+ */
+export function projectResale(price: number, years = 5): ResalePoint[] {
+  const pts: ResalePoint[] = [];
+  let retention = 1;
+  for (let y = 1; y <= years; y++) {
+    retention *= y === 1 ? 0.82 : y <= 3 ? 0.9 : y <= 6 ? 0.92 : 0.94;
+    pts.push({ year: y, value: Math.round((price * retention) / 500) * 500, retainedPct: Math.round(retention * 100) });
+  }
+  return pts;
+}
+
+/**
+ * 5-year ownership cost (total cost of ownership) for one vehicle.
+ * Combines purchase (on-road), energy, insurance renewals, service and a
+ * depreciation-based resale estimate. Every figure is an ESTIMATE derived
+ * from the inputs and clearly-labelled assumptions — missing data is reported,
+ * never invented.
+ */
+export interface OwnershipInput {
+  price: number | null;                 // ex-showroom price (₹)
+  fuel: 'petrol' | 'electric';
+  mileageKmpl?: number | null;          // petrol only
+  batteryKwh?: number | null;           // electric only
+  rangeKm?: number | null;              // electric only
+  years?: number;                       // ownership period, default 5
+  kmPerYear?: number;                   // default 10,000
+  petrolPrice?: number;                 // ₹/litre
+  electricityPrice?: number;            // ₹/unit (kWh)
+  chargingEfficiencyPercent?: number;   // default 85
+}
+
+export interface OwnershipYear {
+  year: number;
+  energy: number;
+  insurance: number;
+  service: number;
+  runningTotal: number;     // energy+insurance+service for this year
+  cumulative: number;       // purchase + running up to and including this year
+}
+
+export interface OwnershipResult {
+  onRoadPrice: number | null;           // ex-showroom + RTO + first-year insurance
+  energyPerKm: number | null;           // ₹/km energy only
+  energyPerYear: number;
+  insuranceRenewal: number;             // per year after year 1
+  servicePerYear: number;
+  years: OwnershipYear[];
+  totalEnergy: number;
+  totalInsurance: number;
+  totalService: number;
+  totalCost: number;                    // purchase + running over the period
+  costPerKm: number | null;             // totalCost / total km
+  costPerMonth: number;                 // totalCost / (years*12)
+  resaleValue: number | null;           // estimated resale at end of period
+  netCost: number | null;               // totalCost - resaleValue
+  missing: string[];                    // what data is missing (never invented)
+  assumptions: string[];
+}
+
+const RTO_RATE = 0.09;        // typical two-wheeler road tax ≈ 9% of ex-showroom (varies by state)
+const INSURANCE_RATE = 0.05;  // first-year comprehensive ≈ 5% of ex-showroom
+const INSURANCE_MIN = 2500;
+const INSURANCE_MAX = 18000;
+const RENEWAL_RATE = 0.45;    // renewal (own-damage depreciates) ≈ 45% of first-year premium
+const RENEWAL_MIN = 1800;
+const PETROL_SERVICE = 3500;  // ₹/year, typical scheduled service average
+const EV_SERVICE = 1500;      // ₹/year, EVs need less scheduled maintenance
+
+export function ownershipCost(i: OwnershipInput): OwnershipResult {
+  const years = Math.max(1, Math.min(8, Math.round(i.years ?? 5)));
+  const kmPerYear = Math.max(500, i.kmPerYear ?? 10000);
+  const petrolPrice = i.petrolPrice ?? 104.5;
+  const electricityPrice = i.electricityPrice ?? 8;
+  const eff = Math.max(0.4, Math.min(1, (i.chargingEfficiencyPercent ?? 85) / 100));
+
+  const missing: string[] = [];
+  let energyPerKm: number | null = null;
+
+  if (i.fuel === 'petrol') {
+    if (!i.mileageKmpl) missing.push('recorded mileage (kmpl) — fuel cost cannot be calculated');
+    else energyPerKm = petrolPrice / i.mileageKmpl;
+  } else {
+    if (!i.batteryKwh || !i.rangeKm) missing.push('battery capacity and range — electricity cost cannot be calculated');
+    else energyPerKm = ((i.batteryKwh / i.rangeKm) * electricityPrice) / eff;
+  }
+
+  const energyPerYear = energyPerKm ? Math.round(energyPerKm * kmPerYear) : 0;
+
+  let onRoadPrice: number | null = null;
+  if (i.price != null && i.price > 0) {
+    const insurance = Math.max(INSURANCE_MIN, Math.min(INSURANCE_MAX, i.price * INSURANCE_RATE));
+    onRoadPrice = Math.round(i.price + i.price * RTO_RATE + insurance);
+  } else {
+    missing.push('ex-showroom price — purchase cost cannot be calculated');
+  }
+
+  const insuranceFirstYear = i.price != null && i.price > 0
+    ? Math.max(INSURANCE_MIN, Math.min(INSURANCE_MAX, i.price * INSURANCE_RATE))
+    : 0;
+  const insuranceRenewal = Math.max(RENEWAL_MIN, Math.round(insuranceFirstYear * RENEWAL_RATE));
+  const servicePerYear = i.fuel === 'electric' ? EV_SERVICE : PETROL_SERVICE;
+
+  const yrs: OwnershipYear[] = [];
+  let cumulative = onRoadPrice ?? 0;
+  for (let y = 1; y <= years; y++) {
+    const insurance = y === 1 ? 0 : insuranceRenewal; // year 1 premium is inside the on-road price
+    const runningTotal = energyPerYear + insurance + servicePerYear;
+    cumulative += runningTotal;
+    yrs.push({ year: y, energy: energyPerYear, insurance, service: servicePerYear, runningTotal, cumulative });
+  }
+
+  const totalEnergy = energyPerYear * years;
+  const totalInsurance = insuranceRenewal * (years - 1);
+  const totalService = servicePerYear * years;
+  const totalCost = (onRoadPrice ?? 0) + totalEnergy + totalInsurance + totalService;
+
+  // Resale: same depreciation curve as the used-price estimator.
+  let resaleValue: number | null = null;
+  if (i.price != null && i.price > 0) {
+    const curve = projectResale(i.price, years);
+    resaleValue = curve[curve.length - 1].value;
+  }
+
+  const totalKm = kmPerYear * years;
+  const assumptions: string[] = [
+    `On-road price = ex-showroom + ~${Math.round(RTO_RATE * 100)}% RTO + first-year insurance (~${Math.round(INSURANCE_RATE * 100)}% of ex-showroom).`,
+    `Insurance renewals assumed at ~${Math.round(RENEWAL_RATE * 100)}% of the first-year premium (own-damage cover reduces over time).`,
+    `Scheduled service assumed at ₹${servicePerYear.toLocaleString('en-IN')}/year${i.fuel === 'electric' ? ' (EVs need less maintenance)' : ''}.`,
+    `Depreciation uses a standard two-wheeler curve; resale value is indicative only.`,
+    'All figures are estimates — real costs vary with state taxes, insurer, riding style and service pricing.',
+  ];
+  if (i.fuel === 'petrol') assumptions.unshift(`Fuel at ₹${petrolPrice}/litre with the recorded ${i.mileageKmpl ?? '—'} kmpl.`);
+  else assumptions.unshift(`Electricity at ₹${electricityPrice}/unit with ${Math.round(eff * 100)}% charging efficiency over ${i.rangeKm ?? '—'} km range.`);
+
+  return {
+    onRoadPrice,
+    energyPerKm: energyPerKm == null ? null : round2(energyPerKm),
+    energyPerYear,
+    insuranceRenewal,
+    servicePerYear,
+    years: yrs,
+    totalEnergy,
+    totalInsurance,
+    totalService,
+    totalCost,
+    costPerKm: totalKm > 0 ? round2(totalCost / totalKm) : null,
+    costPerMonth: Math.round(totalCost / (years * 12)),
+    resaleValue,
+    netCost: resaleValue != null ? totalCost - resaleValue : null,
+    missing,
+    assumptions,
+  };
+}

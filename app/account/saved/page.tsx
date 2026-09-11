@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
-import { relative, inr } from '@/lib/format';
+import { relative, inr, parseProductIds } from '@/lib/format';
 import { Empty } from '@/components/ui';
 import { buildMetadata } from '@/lib/seo';
 
@@ -67,7 +67,7 @@ export default async function SavedPage() {
                 <Link href={`/compare/${c.slug}`} className="text-[13.5px] font-semibold hover:text-brand-700">{c.title}</Link>
                 <p className="text-[12px] text-ink-mute">Saved {relative(c.created_at)} · {c.view_count || 0} views</p>
               </div>
-              <Link href={`/compare?ids=${c.product_ids}`} className="btn-outline btn-sm">Open</Link>
+              <Link href={`/compare?ids=${parseProductIds(c.product_ids).join(',')}`} className="btn-outline btn-sm">Open</Link>
             </li>
           ))}
         </ul>

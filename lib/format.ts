@@ -8,6 +8,31 @@ export function inr(value: number | null | undefined, opts: { compact?: boolean 
   return `₹${Math.round(value).toLocaleString('en-IN')}`;
 }
 
+/**
+ * Parse a stored `product_ids` value into a clean string[] of ids.
+ *
+ * The comparisons / saved_comparisons tables contain both shapes:
+ *   - JSON arrays      → '["prd_1","prd_2"]'  (seed / app writes)
+ *   - comma lists      → 'prd_1,prd_2'        (admin UI writes)
+ *
+ * This never throws — invalid JSON falls back to a comma split, and
+ * malformed rows simply yield an empty (or partial) list so a single
+ * bad row can never take down a whole page.
+ */
+export function parseProductIds(raw: string | null | undefined): string[] {
+  const s = (raw ?? '').trim();
+  if (!s) return [];
+  if (s.startsWith('[')) {
+    try {
+      const arr = JSON.parse(s);
+      if (Array.isArray(arr)) return arr.map((x) => String(x).trim()).filter(Boolean);
+    } catch {
+      /* not real JSON — fall through to comma split */
+    }
+  }
+  return s.split(',').map((x) => x.trim()).filter(Boolean);
+}
+
 export function num(value: number | null | undefined, unit = '', digits = 1): string {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
   const n = Number(value);

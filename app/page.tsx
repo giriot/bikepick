@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { db } from '@/lib/db';
 import { listProducts, listUsedBikes, getStats } from '@/lib/queries';
 import { getSettings, isOn } from '@/lib/settings';
-import { inr, relative } from '@/lib/format';
+import { inr, relative, parseProductIds } from '@/lib/format';
 import { ProductCard } from '@/components/ProductCard';
 import { CategoryChooser, ChangeCategoryButton } from '@/components/CategoryChooser';
 import { SearchBox } from '@/components/SearchBox';
@@ -105,7 +105,8 @@ export default async function HomePage() {
           />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {comparisons.map((c) => {
-              const ids = JSON.parse(c.product_ids) as string[];
+              const ids = parseProductIds(c.product_ids);
+              if (ids.length < 2) return null;
               return (
                 <Link key={c.id} href={`/compare?ids=${ids.join(',')}`} className="card card-hover flex items-center justify-between gap-3 p-4">
                   <div>

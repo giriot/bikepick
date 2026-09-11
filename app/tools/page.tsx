@@ -12,6 +12,7 @@ const TOOLS = [
   { href: '/tools/ev-vs-petrol', title: 'EV vs petrol calculator', body: 'Cost per km, monthly saving and how long the price difference takes to pay back.', tag: 'Most used' },
   { href: '/tools/emi', title: 'EMI calculator', body: 'Monthly instalment, total interest and a month-by-month repayment schedule.', tag: null },
   { href: '/tools/used-bike-price', title: 'Used bike price estimator', body: 'A fair market range for any used two-wheeler based on age, kilometres, owners and paperwork.', tag: null },
+  { href: '/tools/ownership', title: '5-year ownership cost calculator', body: 'The true cost of any bike or scooter: on-road price, energy, insurance, service and resale — petrol vs EV side by side.', tag: 'New' },
   { href: '/find-my-bike', title: 'Find my bike', body: 'Answer five questions about budget and use, get a shortlist scored against your priorities.', tag: 'Guided' },
 ];
 
