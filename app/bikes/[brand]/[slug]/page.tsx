@@ -381,8 +381,9 @@ export default async function ProductPage({ params, searchParams }: Params) {
               </section>
             )}
 
-            {/* Variants — side-by-side comparison table */}
-            {variants.length > 0 && (
+            {/* Variants — side-by-side comparison table (multiple variants only:
+                with 0–1 variants it would just repeat the full spec section below) */}
+            {variants.length > 1 && (
               <VariantTable
                 variants={variants}
                 vSpecMap={vSpecMap}
@@ -393,8 +394,12 @@ export default async function ProductPage({ params, searchParams }: Params) {
               />
             )}
 
-            {/* Full specification sheet */}
-            <FullSpecSheet bike={bike} ev={ev} isEv={isEv} />
+            {/* Sidebar spec sheet — multiple variants only. Single-variant models
+                show the full specification in ONE area: the full-width
+                "Full specifications" section below (no duplicate sheet here). */}
+            {variants.length > 1 && (
+              <FullSpecSheet bike={bike} ev={ev} isEv={isEv} />
+            )}
 
             {/* Actions — all real, compact */}
             <div className="mt-5 grid grid-cols-2 gap-2">
