@@ -9,7 +9,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   const statics = [
-    '', '/bikes', '/electric', '/used-bikes', '/used-bikes/sell', '/compare', '/dealer-offers',
+    '', '/bikes', '/electric', '/hybrid', '/used-bikes', '/used-bikes/sell', '/compare', '/dealer-offers',
     '/guides', '/reviews', '/find-my-bike', '/tools/ev-vs-petrol', '/tools/emi', '/tools/used-bike-price',
     '/service-centres', '/inspection', '/dealer/register', '/dealer/subscription', '/business/bulk-enquiry',
     '/legal/privacy', '/legal/terms', '/legal/cookies', '/legal/disclaimer', '/legal/affiliate-disclosure',

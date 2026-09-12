@@ -10,7 +10,7 @@ import { Breadcrumbs, Empty, Pagination } from '@/components/ui';
 import { AdSlot } from '@/components/AdSlot';
 
 export interface ListingProps {
-  category: 'bikes' | 'electric';
+  category: 'bikes' | 'electric' | 'hybrid';
   title: string;
   intro: string;
   searchParams: Record<string, string | string[] | undefined>;

@@ -109,7 +109,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
     searchColumns: ['t.name', 't.slug', 'b.name'],
     filters: [
       { name: 'status', label: 'Status', column: 't.status', options: ['draft', 'published', 'unpublished', 'archived'] },
-      { name: 'fuel_type', label: 'Fuel', column: 't.fuel_type', options: ['petrol', 'electric'] },
+      { name: 'fuel_type', label: 'Fuel', column: 't.fuel_type', options: ['petrol', 'electric', 'cng', 'hybrid'] },
     ],
     defaultSort: 't.updated_at DESC',
     fields: [
@@ -117,7 +117,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
       { name: 'slug', label: 'URL slug', type: 'text', help: 'Leave blank to generate from the name.', group: 'Basics' },
       { name: 'brand_id', label: 'Brand', type: 'relation', required: true, relation: { table: 'brands', labelColumn: 'name' }, group: 'Basics' },
       { name: 'category_id', label: 'Category', type: 'relation', relation: { table: 'categories', labelColumn: 'name' }, group: 'Basics' },
-      { name: 'fuel_type', label: 'Fuel type', type: 'select', required: true, options: sel('petrol', 'electric'), group: 'Basics' },
+      { name: 'fuel_type', label: 'Fuel type', type: 'select', required: true, options: sel('petrol', 'electric', 'cng', 'hybrid'), group: 'Basics' },
       { name: 'body_type', label: 'Body type', type: 'select', options: sel('commuter', 'sport', 'street', 'cruiser', 'adventure', 'scooter'), group: 'Basics' },
       { name: 'model_year', label: 'Model year', type: 'number', group: 'Basics' },
       { name: 'generation', label: 'Generation', type: 'text', group: 'Basics' },

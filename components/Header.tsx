@@ -10,6 +10,7 @@ import type { AppUser } from '@/types';
 const NAV = [
   { href: '/bikes', label: 'Bikes' },
   { href: '/electric', label: 'Electric' },
+  { href: '/hybrid', label: 'Hybrid' },
   { href: '/compare', label: 'Compare' },
   { href: '/used-bikes', label: 'Used Bikes' },
   { href: '/dealer-offers', label: 'Dealer Offers' },

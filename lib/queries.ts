@@ -57,11 +57,13 @@ const CARD_SELECT = `
     LEFT JOIN bike_specs bs ON bs.product_id = p.id AND bs.variant_id IS NULL
     LEFT JOIN ev_specs es ON es.product_id = p.id AND es.variant_id IS NULL`;
 
-/** 'bikes' / 'electric' are the site's fuel groups; the database stores
-    finer-grained categories (motorcycle, scooter, electric-*). Map them. */
+/** 'bikes' / 'electric' / 'hybrid' are the site's fuel groups; the database
+    stores finer-grained categories (motorcycle, scooter, electric-*) plus a
+    fuel_type column. Map the groups; hybrid = CNG/bi-fuel (cng, hybrid, cng_petrol). */
 export function categoryClause(slug: string): { sql: string; params: string[] } {
   if (slug === 'bikes') return { sql: "c.slug IN ('motorcycle','scooter')", params: [] };
   if (slug === 'electric') return { sql: "c.slug IN ('electric-scooter','electric-motorcycle')", params: [] };
+  if (slug === 'hybrid') return { sql: "p.fuel_type IN ('cng','hybrid','cng_petrol')", params: [] };
   return { sql: 'c.slug = ?', params: [slug] };
 }
 
@@ -323,12 +325,13 @@ export async function listUsedBikes(f: UsedBikeFilters = {}) {
 
 export async function getStats() {
   const q = async (sql: string, p: any[] = []) => Number((await db.get<any>(sql, p))?.n || 0);
-  const [bikes, evs, used, dealers, offers] = await Promise.all([
+  const [bikes, evs, hybrids, used, dealers, offers] = await Promise.all([
     q("SELECT COUNT(*) AS n FROM products WHERE status='published' AND deleted_at IS NULL"),
     q("SELECT COUNT(*) AS n FROM products WHERE status='published' AND fuel_type='electric' AND deleted_at IS NULL"),
+    q("SELECT COUNT(*) AS n FROM products WHERE status='published' AND fuel_type IN ('cng','hybrid','cng_petrol') AND deleted_at IS NULL"),
     q("SELECT COUNT(*) AS n FROM used_bikes WHERE status='approved' AND deleted_at IS NULL"),
     q("SELECT COUNT(*) AS n FROM dealer_profiles WHERE status='verified' AND deleted_at IS NULL"),
     q("SELECT COUNT(*) AS n FROM dealer_offers WHERE status='approved' AND deleted_at IS NULL"),
   ]);
-  return { bikes, evs, used, dealers, offers };
+  return { bikes, evs, hybrids, used, dealers, offers };
 }

@@ -80,18 +80,23 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Two category cards (Used Bikes card removed per user request;
-              AI-generated studio photos instead of the old line-art SVGs) */}
-          <div className="mt-12 grid gap-4 md:grid-cols-2">
+          {/* Three fuel-group category cards (Used Bikes card removed per user
+              request; AI-generated studio photos instead of the old line-art SVGs) */}
+          <div className="mt-12 grid gap-4 md:grid-cols-3">
             <CategoryCard
               href="/bikes" title="Bikes & Scooters"
               body="Petrol motorcycles and scooters with full specification sheets, pros and cons, and dealer offers."
-              cta={`${stats.bikes - stats.evs} models`} art="/media/cat-bikes.jpg" tone="brand" cover
+              cta={`${stats.bikes - stats.evs - stats.hybrids} models`} art="/media/cat-bikes.jpg" tone="brand" cover
             />
             <CategoryCard
               href="/electric" title="Electric"
               body="EV scooters and motorcycles with claimed range, our own real-world estimate and charging detail."
               cta={`${stats.evs} EVs`} art="/media/cat-electric.jpg" tone="accent" cover
+            />
+            <CategoryCard
+              href="/hybrid" title="Hybrid"
+              body="Bi-fuel CNG + petrol bikes like the Bajaj Freedom 125 — CNG mileage in km/kg, combined range and honest running cost."
+              cta={`${stats.hybrids} models`} art="/media/cat-hybrid.jpg" tone="ink" cover
             />
           </div>
         </div>
