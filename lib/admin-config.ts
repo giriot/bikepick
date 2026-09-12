@@ -110,6 +110,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
     filters: [
       { name: 'status', label: 'Status', column: 't.status', options: ['draft', 'published', 'unpublished', 'archived'] },
       { name: 'fuel_type', label: 'Fuel', column: 't.fuel_type', options: ['petrol', 'electric', 'cng', 'hybrid'] },
+      { name: 'ethanol_blend', label: 'Ethanol', column: 't.ethanol_blend', options: ['e20', 'e85', 'e100', 'none'] },
     ],
     defaultSort: 't.updated_at DESC',
     fields: [
@@ -118,6 +119,13 @@ export const ADMIN_RESOURCES: AdminResource[] = [
       { name: 'brand_id', label: 'Brand', type: 'relation', required: true, relation: { table: 'brands', labelColumn: 'name' }, group: 'Basics' },
       { name: 'category_id', label: 'Category', type: 'relation', relation: { table: 'categories', labelColumn: 'name' }, group: 'Basics' },
       { name: 'fuel_type', label: 'Fuel type', type: 'select', required: true, options: sel('petrol', 'electric', 'cng', 'hybrid'), group: 'Basics' },
+      { name: 'ethanol_blend', label: 'Ethanol (blend) support', type: 'select', options: [
+        { value: '', label: 'Not recorded' },
+        { value: 'e20', label: 'E20 ready' },
+        { value: 'e85', label: 'Flex-fuel E20–E85' },
+        { value: 'e100', label: 'Flex-fuel E20–E100' },
+        { value: 'none', label: 'No ethanol support' },
+      ], group: 'Basics' },
       { name: 'body_type', label: 'Body type', type: 'select', options: sel('commuter', 'sport', 'street', 'cruiser', 'adventure', 'scooter'), group: 'Basics' },
       { name: 'model_year', label: 'Model year', type: 'number', group: 'Basics' },
       { name: 'generation', label: 'Generation', type: 'text', group: 'Basics' },

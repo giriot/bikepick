@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { getProductBySlug, listProducts, listUsedBikes } from '@/lib/queries';
+import { EthanolBadge } from '@/components/EthanolBadge';
 import { getCurrentUser } from '@/lib/auth';
 import { getJsonSetting } from '@/lib/settings';
 import { computeScore, DEFAULT_WEIGHTS, type ScoreWeights } from '@/lib/score';
@@ -280,6 +281,11 @@ export default async function ProductPage({ params, searchParams }: Params) {
               {product.brand_name}
             </p>
             <h1 className="mt-1 text-3xl font-bold tracking-[-0.035em] sm:text-[38px]">{product.name}</h1>
+            {product.ethanol_blend && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <EthanolBadge blend={product.ethanol_blend} size="md" />
+              </div>
+            )}
             <p className="mt-2 text-sm leading-6 text-ink-mute">{product.description}</p>
 
             <div className="mt-5 flex flex-wrap items-center gap-4 rounded-2xl border border-line bg-surface p-4">
@@ -798,10 +804,21 @@ function priceModelGroup(p: any, fuelLabel: string) {
   ] as [string, any][] };
 }
 
+function ethanolSpecRow(p: any) {
+  const v = p?.ethanol_blend;
+  if (v === 'e20') return { text: 'E20 ready', badge: 'E20', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', note: "Runs on E20 petrol (20% ethanol) — India's standard fuel since 2026." };
+  if (v === 'e85') return { text: 'Flex-fuel E20–E85', badge: 'Flex', cls: 'bg-teal-50 text-teal-700 ring-teal-200', note: 'Runs on any ethanol blend from E20 up to E85.' };
+  if (v === 'e100') return { text: 'Flex-fuel E20–E100', badge: 'Flex', cls: 'bg-green-50 text-green-700 ring-green-200', note: 'Runs on any ethanol blend from E20 up to E100.' };
+  if (v === 'none') return { text: 'No ethanol support', badge: 'Petrol only', cls: 'bg-surface text-ink-mute ring-line', note: "Not certified for ethanol blends — check the owner's manual before using E20." };
+  return null;
+}
+
 function BIKE_GROUPS(b: any, p: any, onRoadMin: number | null) {
   const isCng = p?.fuel_type === 'cng' || p?.fuel_type === 'hybrid' || p?.fuel_type === 'cng_petrol';
+  const priceGroup = priceModelGroup(p, isCng ? 'CNG + Petrol' : 'Petrol');
+  priceGroup.rows.push(['Ethanol (blend)', ethanolSpecRow(p)]);
   return [
-    priceModelGroup(p, isCng ? 'CNG + Petrol' : 'Petrol'),
+    priceGroup,
     { title: 'Engine & transmission', rows: [
       ['Engine type', b?.engine_type], ['Displacement', num(b?.engine_capacity_cc, 'cc')],
       ['Max power', b?.max_power_bhp ? `${b.max_power_bhp} bhp${b.max_power_rpm ? ` @ ${b.max_power_rpm} rpm` : ''}` : null],

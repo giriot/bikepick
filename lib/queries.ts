@@ -18,6 +18,7 @@ export interface ProductFilters {
   category?: string;
   brand?: string | string[];
   fuel?: string;
+  ethanol?: string;
   minPrice?: number;
   maxPrice?: number;
   minCc?: number;
@@ -26,7 +27,7 @@ export interface ProductFilters {
   abs?: boolean;
   bodyType?: string;
   q?: string;
-  sort?: 'popular' | 'price_low' | 'price_high' | 'score' | 'newest' | 'mileage' | 'range';
+  sort?: 'popular' | 'price_low' | 'price_high' | 'score' | 'newest' | 'mileage' | 'range' | 'ethanol';
   page?: number;
   perPage?: number;
 }
@@ -34,6 +35,7 @@ export interface ProductFilters {
 export interface ProductCard {
   id: string; name: string; slug: string; brand_name: string; brand_slug: string;
   category_slug: string; fuel_type: string | null; body_type: string | null;
+  ethanol_blend: string | null;
   price_min: number | null; price_max: number | null; score: number | null;
   image_url: string | null; alt_text: string | null; is_demo: number; featured: number;
   engine_capacity_cc: number | null; mileage_kmpl: number | null; max_power_bhp: number | null;
@@ -42,7 +44,7 @@ export interface ProductCard {
 }
 
 const CARD_SELECT = `
-  SELECT p.id, p.name, p.slug, p.fuel_type, p.body_type, p.price_min, p.price_max, p.score,
+  SELECT p.id, p.name, p.slug, p.fuel_type, p.ethanol_blend, p.body_type, p.price_min, p.price_max, p.score,
          p.is_demo, p.featured, p.popularity,
          b.name AS brand_name, b.slug AS brand_slug, c.slug AS category_slug,
          bs.engine_capacity_cc, bs.mileage_kmpl, bs.max_power_bhp, bs.abs_type,
@@ -64,6 +66,7 @@ export function categoryClause(slug: string): { sql: string; params: string[] } 
   if (slug === 'bikes') return { sql: "c.slug IN ('motorcycle','scooter')", params: [] };
   if (slug === 'electric') return { sql: "c.slug IN ('electric-scooter','electric-motorcycle')", params: [] };
   if (slug === 'hybrid') return { sql: "p.fuel_type IN ('cng','hybrid','cng_petrol')", params: [] };
+  if (slug === 'ethanol') return { sql: "(p.ethanol_blend IS NOT NULL AND p.ethanol_blend <> 'none')", params: [] };
   return { sql: 'c.slug = ?', params: [slug] };
 }
 
@@ -77,6 +80,10 @@ export async function listProducts(f: ProductFilters = {}): Promise<{ items: Pro
     params.push(...cc.params);
   }
   if (f.fuel) { where.push('p.fuel_type = ?'); params.push(f.fuel); }
+  if (f.ethanol) {
+    if (f.ethanol === 'flex') where.push("p.ethanol_blend IN ('e85','e100')");
+    else { where.push('p.ethanol_blend = ?'); params.push(f.ethanol); }
+  }
   if (f.bodyType === 'bike') {
     // "bike" lock = everything except scooters (commuter / sport / street / …).
     where.push("(p.body_type IS NULL OR p.body_type <> 'scooter')");
@@ -110,6 +117,7 @@ export async function listProducts(f: ProductFilters = {}): Promise<{ items: Pro
     newest: 'p.model_year DESC, p.created_at DESC',
     mileage: 'bs.mileage_kmpl DESC',
     range: 'COALESCE(es.claimed_range_km, es.real_world_range_km) DESC, p.score DESC',
+    ethanol: "CASE p.ethanol_blend WHEN 'e100' THEN 0 WHEN 'e85' THEN 1 ELSE 2 END, p.popularity DESC, p.score DESC",
   };
   const orderBy = sortMap[f.sort || 'popular'] || sortMap.popular;
 
@@ -333,5 +341,17 @@ export async function getStats() {
     q("SELECT COUNT(*) AS n FROM dealer_profiles WHERE status='verified' AND deleted_at IS NULL"),
     q("SELECT COUNT(*) AS n FROM dealer_offers WHERE status='approved' AND deleted_at IS NULL"),
   ]);
-  return { bikes, evs, hybrids, used, dealers, offers };
+  // Ethanol counts degrade to 0 if the column is not present yet (a pending
+  // runtime migration must never take the homepage down).
+  let ethanols = 0;
+  let flexfuels = 0;
+  try {
+    [ethanols, flexfuels] = await Promise.all([
+      q("SELECT COUNT(*) AS n FROM products WHERE status='published' AND ethanol_blend IN ('e20','e85','e100') AND deleted_at IS NULL"),
+      q("SELECT COUNT(*) AS n FROM products WHERE status='published' AND ethanol_blend IN ('e85','e100') AND deleted_at IS NULL"),
+    ]);
+  } catch {
+    ethanols = 0; flexfuels = 0;
+  }
+  return { bikes, evs, hybrids, ethanols, flexfuels, used, dealers, offers };
 }

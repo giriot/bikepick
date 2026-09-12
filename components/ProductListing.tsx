@@ -10,7 +10,7 @@ import { Breadcrumbs, Empty, Pagination } from '@/components/ui';
 import { AdSlot } from '@/components/AdSlot';
 
 export interface ListingProps {
-  category: 'bikes' | 'electric' | 'hybrid';
+  category: 'bikes' | 'electric' | 'hybrid' | 'ethanol';
   title: string;
   intro: string;
   searchParams: Record<string, string | string[] | undefined>;
@@ -47,9 +47,10 @@ export async function ProductListing({ category, title, intro, searchParams }: L
     minCc: one('minCc') ? Number(one('minCc')) : undefined,
     maxCc: one('maxCc') ? Number(one('maxCc')) : undefined,
     minMileage: one('minMileage') ? Number(one('minMileage')) : undefined,
+    ethanol: one('ethanol'),
     abs: one('abs') === '1',
     q: one('q'),
-    sort: (one('sort') as ProductFilters['sort']) || 'popular',
+    sort: (one('sort') as ProductFilters['sort']) || (category === 'ethanol' ? 'ethanol' : 'popular'),
     page: one('page') ? Number(one('page')) : 1,
     perPage: 12,
   };

@@ -144,6 +144,35 @@ function toPg(sql: string): string {
 const TRANSIENT_PG =
   /ECONNRESET|ECONNREFUSED|ECONNABORTED|EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|EAI_AGAIN|EPIPE|timeout expired|Connection terminated|server closed the connection unexpectedly|connection was closed|terminating connection|no more connections|SSL connection has been closed|ConnectionRefused/i;
 
+/* ------------------- postgres runtime (idempotent) migrations ------------- */
+// The Supabase schema is managed by database/migrations via scripts/migrate.ts,
+// but a one-off additive column cannot wait for a manual run. These statements
+// are applied on first use of any cold instance; each MUST be safe to run
+// repeatedly and concurrently (ADD COLUMN IF NOT EXISTS, CREATE IF NOT EXISTS).
+// They are tracked in the same schema_migrations table the migrate script uses,
+// under distinct names so the two tracks never collide.
+const PG_RUNTIME_MIGRATIONS: { name: string; sql: string }[] = [
+  {
+    name: 'rt_ethanol_blend',
+    sql: 'ALTER TABLE products ADD COLUMN IF NOT EXISTS ethanol_blend TEXT',
+  },
+];
+
+async function applyPgRuntimeMigrations(pool: any) {
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, applied_at TEXT NOT NULL)`,
+  );
+  for (const m of PG_RUNTIME_MIGRATIONS) {
+    const done = await pool.query('SELECT 1 FROM schema_migrations WHERE name = $1', [m.name]);
+    if (done.rows.length) continue;
+    await pool.query(m.sql);
+    await pool.query(
+      'INSERT INTO schema_migrations (id, name, applied_at) VALUES ($1, $2, $3) ON CONFLICT (name) DO NOTHING',
+      [uid('mig'), m.name, nowIso()],
+    );
+  }
+}
+
 function createPostgres(url: string): Driver {
   const { Pool } = require('pg');
   const pool = new Pool({
@@ -160,11 +189,26 @@ function createPostgres(url: string): Driver {
   // function instance overlaps the TLS handshake instead of being cut off
   // by the platform timeout while it waits for one.
   pool.query('SELECT 1').catch(() => { /* retried by the query path below */ });
+
+  // Idempotent additive migrations (see PG_RUNTIME_MIGRATIONS), applied once
+  // per cold instance before the first query. A failure is logged and the site
+  // keeps serving on the previous schema — a migration must never 500 the app.
+  let migrationsDone: Promise<void> | null = null;
+  const ensureMigrated = () => {
+    if (!migrationsDone) {
+      migrationsDone = applyPgRuntimeMigrations(pool).catch((e) => {
+        console.error('[db] postgres runtime migration failed (continuing):', e);
+      });
+    }
+    return migrationsDone;
+  };
+
   let txClient: any = null;
 
   const RETRY_DELAYS = [300, 800, 1800];
 
   const q = async (sql: string, params: Param[] = []) => {
+    await ensureMigrated();
     const pgSql = toPg(sql);
     const paramsNorm = normalizeParams(params);
     let attempt = 0;
@@ -198,6 +242,7 @@ function createPostgres(url: string): Driver {
       await runner.query(sql);
     },
     async tx<T>(fn: () => Promise<T>) {
+      await ensureMigrated();
       const client = await pool.connect();
       txClient = client;
       try {

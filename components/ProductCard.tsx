@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { inr } from '@/lib/format';
 import type { ProductCard as Card } from '@/lib/queries';
 import { CompareToggle } from './CompareToggle';
+import { EthanolBadge } from './EthanolBadge';
 
 export function ProductCard({ p, showCompare = true }: { p: Card; showCompare?: boolean }) {
   const isEv = p.fuel_type === 'electric';
@@ -27,6 +28,7 @@ export function ProductCard({ p, showCompare = true }: { p: Card; showCompare?: 
         />
         <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5">
           {isEv && <span className="badge-ev">Electric</span>}
+          {!isEv && <EthanolBadge blend={p.ethanol_blend} />}
           {p.featured === 1 && <span className="badge bg-ink text-white">Featured</span>}
           {p.is_demo === 1 && <span className="badge-demo">Demo data</span>}
         </div>

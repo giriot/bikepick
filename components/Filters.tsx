@@ -38,7 +38,7 @@ export function Filters({ config }: { config: FilterConfig }) {
       next.forEach((b) => p.append('brand', b));
     });
 
-  const activeCount = ['minPrice', 'maxPrice', 'minCc', 'maxCc', 'minMileage', 'abs', 'bodyType']
+  const activeCount = ['minPrice', 'maxPrice', 'minCc', 'maxCc', 'minMileage', 'abs', 'bodyType', 'ethanol']
     .filter((k) => get(k)).length + selectedBrands.length;
 
   return (
@@ -111,6 +111,17 @@ export function Filters({ config }: { config: FilterConfig }) {
                       className={`chip !py-1 !text-xs ${get('minMileage') === String(m) ? 'chip-active' : ''}`}>{m}+ kmpl</button>
                   ))}
                 </div>
+              </Group>
+              <Group title="Ethanol blend">
+                <div className="flex flex-wrap gap-1.5">
+                  {[['e20', 'E20 ready'], ['flex', 'Flex-fuel (E85–E100)'], ['none', 'No ethanol']].map(([v, label]) => (
+                    <button key={v} type="button" onClick={() => setParam('ethanol', get('ethanol') === v ? '' : v)}
+                      className={`chip !py-1 !text-xs ${get('ethanol') === v ? 'chip-active' : ''}`}>{label}</button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[11px] leading-4 text-ink-mute">
+                  Every new petrol bike sold since April 2023 is E20-ready by the BS6 Phase 2 mandate.
+                </p>
               </Group>
             </>
           )}

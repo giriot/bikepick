@@ -82,7 +82,7 @@ export default async function HomePage() {
 
           {/* Three fuel-group category cards (Used Bikes card removed per user
               request; AI-generated studio photos instead of the old line-art SVGs) */}
-          <div className="mt-12 grid gap-4 md:grid-cols-3">
+          <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <CategoryCard
               href="/bikes" title="Bikes & Scooters"
               body="Petrol motorcycles and scooters with full specification sheets, pros and cons, and dealer offers."
@@ -97,6 +97,11 @@ export default async function HomePage() {
               href="/hybrid" title="Hybrid"
               body="Bi-fuel CNG + petrol bikes like the Bajaj Freedom 125 — CNG mileage in km/kg, combined range and honest running cost."
               cta={`${stats.hybrids} models`} art="/media/cat-hybrid.jpg" tone="ink" cover
+            />
+            <CategoryCard
+              href="/ethanol" title="Ethanol"
+              body="Ethanol-blend capability for every petrol model — E20-ready today, flex-fuel E85/E100 as it arrives in India."
+              cta={stats.flexfuels > 0 ? `${stats.flexfuels} flex-fuel` : 'E20–E100'} art="/media/cat-ethanol.jpg" tone="brand" cover
             />
           </div>
         </div>
