@@ -16,7 +16,6 @@ import { PriceAlertButton } from '@/components/PriceAlertButton';
 import { CompareToggle } from '@/components/CompareToggle';
 import { SaveButton } from '@/components/SaveButton';
 import { VariantTable } from '@/components/VariantTable';
-import { FullSpecSheet } from '@/components/FullSpecSheet';
 import { ProductGallery } from '@/components/ProductGallery';
 import { SpecSuggestionForm } from '@/components/SpecSuggestionForm';
 import { featureAdvantage } from '@/lib/spec-dots';
@@ -110,6 +109,15 @@ export default async function ProductPage({ params, searchParams }: Params) {
   const cons: string[] = toStrArray(product.cons);
   const bestFor: string[] = (typeof product.best_for === 'string' ? product.best_for : '')
     .split(/[,;•]+/).map((s: string) => s.trim()).filter(Boolean);
+  // Same-segment models that cost LESS than this bike — a price-conscious hint
+  // (real data from the category listing, never invented).
+  const segmentHasOthers = (similar.items || []).some((s) => s.id !== product.id);
+  const cheaper = product.price_min != null
+    ? (similar.items || [])
+        .filter((s) => s.id !== product.id && s.price_min != null && s.price_min < (product.price_min as number))
+        .sort((a, b) => (a.price_min ?? 0) - (b.price_min ?? 0))
+        .slice(0, 2)
+    : [];
   const approvedReviews = reviews;
   const avgRating = approvedReviews.length
     ? approvedReviews.reduce((a: number, r: any) => a + r.rating, 0) / approvedReviews.length
@@ -315,6 +323,20 @@ export default async function ProductPage({ params, searchParams }: Params) {
                 </div>
 
                 <div className="p-4">
+                  {/* Bikepick Score — computed from specs & price only */}
+                  <div className="flex items-center gap-3.5">
+                    <ScoreRing score={scored.total} size={70} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold text-ink-soft">Bikepick Score</p>
+                      <p className="text-[11px] leading-4 text-ink-mute">
+                        Weighted pillars from specifications &amp; price — never paid placement.{' '}
+                        <Link href="#score" className="font-semibold text-brand-600 hover:underline">Why this score?</Link>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="my-3 border-t border-line" />
+
                   {/* Ring gauge + headline numbers */}
                   <div className="flex items-center gap-4">
                     <svg width="86" height="86" viewBox="0 0 86 86" className="shrink-0" role="img" aria-label={`${retention5}% of price retained after 5 years`}>
@@ -361,17 +383,54 @@ export default async function ProductPage({ params, searchParams }: Params) {
                     ))}
                   </div>
 
-                  {/* Running cost tiles */}
-                  <div className="mt-3.5 grid grid-cols-2 gap-2">
-                    <div className="rounded-lg bg-surface px-3 py-2">
-                      <p className="text-[10px] text-ink-mute">{isEv ? '⚡ Cost/km (electricity)' : '⛽ Cost/km (fuel)'}</p>
-                      <p className="mt-0.5 text-[14px] font-bold">{costPerKm ? `₹${costPerKm.toFixed(2)}` : '—'}</p>
+                  {/* Running cost — prominent per-km figure */}
+                  <div className="mt-3.5 rounded-lg border border-brand-100 bg-brand-50/70 px-3 py-2.5">
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] text-ink-mute">{isEv ? '⚡ Running cost (electricity)' : '⛽ Running cost (fuel)'}</p>
+                        <p className="text-[20px] font-extrabold leading-none tracking-tight">
+                          {costPerKm ? `₹${costPerKm.toFixed(2)}` : '—'}
+                          <span className="text-[11px] font-medium text-ink-mute">/km</span>
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-ink-mute">≈ per month</p>
+                        <p className="text-[14.5px] font-bold">{costPerKm ? inr(Math.round(costPerKm * monthlyKm)) : '—'}</p>
+                      </div>
                     </div>
-                    <div className="rounded-lg bg-surface px-3 py-2">
-                      <p className="text-[10px] text-ink-mute">📅 Est. monthly ({monthlyKm} km)</p>
-                      <p className="mt-0.5 text-[14px] font-bold">{costPerKm ? inr(Math.round(costPerKm * monthlyKm)) : '—'}</p>
-                    </div>
+                    <p className="mt-1.5 text-[9.5px] leading-4 text-ink-mute">
+                      Based on {monthlyKm} km/month typical usage — energy cost only, maintenance excluded.
+                    </p>
                   </div>
+
+                  {/* Cheaper in this segment — price-conscious hint */}
+                  {cheaper.length > 0 ? (
+                    <div className="mt-2.5 rounded-lg border border-accent/25 bg-accent-soft/60 px-3 py-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-accent-dark">💡 Cheaper in this segment</p>
+                      <ul className="mt-1.5 space-y-1.5">
+                        {cheaper.map((s) => (
+                          <li key={s.id} className="flex items-center justify-between gap-2 text-[12px]">
+                            <Link
+                              href={`/${s.fuel_type === 'electric' ? 'electric' : 'bikes'}/${s.brand_slug}/${s.slug}`}
+                              className="min-w-0 truncate font-medium hover:text-brand-600 hover:underline"
+                            >
+                              {s.brand_name} {s.name}
+                            </Link>
+                            <span className="shrink-0 text-right">
+                              <span className="font-bold text-accent-dark">{inr(s.price_min)}</span>
+                              <span className="ml-1 text-[10px] text-ink-mute">
+                                save {inr((product.price_min as number) - (s.price_min ?? 0))}
+                              </span>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : segmentHasOthers ? (
+                    <div className="mt-2.5 rounded-lg border border-accent/25 bg-accent-soft/60 px-3 py-2.5 text-[12px] leading-5 text-accent-dark">
+                      <span className="font-bold">Most affordable in this segment</span> — no similar model is listed cheaper right now.
+                    </div>
+                  ) : null}
 
                   <p className="mt-2.5 text-[10px] leading-4 text-ink-mute">
                     {isEv ? 'Assumes a healthy battery. ' : ''}Depreciation uses a standard two-wheeler curve and today&apos;s
@@ -379,26 +438,6 @@ export default async function ProductPage({ params, searchParams }: Params) {
                   </p>
                 </div>
               </section>
-            )}
-
-            {/* Variants — side-by-side comparison table (multiple variants only:
-                with 0–1 variants it would just repeat the full spec section below) */}
-            {variants.length > 1 && (
-              <VariantTable
-                variants={variants}
-                vSpecMap={vSpecMap}
-                modelSpec={isEv ? ev : bike}
-                isEv={isEv}
-                fuelLabel={isEv ? 'Electric' : 'Petrol'}
-                priceFrom={product.price_min}
-              />
-            )}
-
-            {/* Sidebar spec sheet — multiple variants only. Single-variant models
-                show the full specification in ONE area: the full-width
-                "Full specifications" section below (no duplicate sheet here). */}
-            {variants.length > 1 && (
-              <FullSpecSheet bike={bike} ev={ev} isEv={isEv} />
             )}
 
             {/* Actions — all real, compact */}
@@ -442,6 +481,23 @@ export default async function ProductPage({ params, searchParams }: Params) {
         </div>
 
         <AdSlot slotKey="product_sidebar" className="mt-8" />
+
+        {/* ------------------------- VARIANT COMPARISON ----------------------
+            Multi-variant models get a full-width side-by-side table here,
+            directly above the full specification sheet — specs live in ONE
+            clear area below the hero (nothing repeated in the sidebar). */}
+        {variants.length > 1 && (
+          <section className="mt-12" id="variants">
+            <VariantTable
+              variants={variants}
+              vSpecMap={vSpecMap}
+              modelSpec={isEv ? ev : bike}
+              isEv={isEv}
+              fuelLabel={isEv ? 'Electric' : 'Petrol'}
+              priceFrom={product.price_min}
+            />
+          </section>
+        )}
 
         {/* ------------------------------ SPECS ----------------------------- */}
         <section className="mt-12" id="specifications">
