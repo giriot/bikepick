@@ -15,7 +15,7 @@ import { BIKE_SPEC_KEYS, EV_SPEC_KEYS } from '@/lib/spec-fields';
  * this model" survives in the spreadsheet without polluting the database.
  */
 export const SPEC_SHEET_ID_COLUMNS = [
-  'brand', 'name', 'slug', 'status', 'fuel_type', 'model_year',
+  'brand', 'name', 'slug', 'status', 'fuel_type', 'ethanol_blend', 'model_year',
   'price_min', 'price_max', 'verification_status', 'source_name',
 ] as const;
 

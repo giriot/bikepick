@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     if (status !== 'all') { where.push('p.status = ?'); params.push(status); }
 
     const products = await db.all<any>(
-      `SELECT p.id, p.name, b.name AS brand, p.slug, p.status, p.fuel_type, p.model_year,
+      `SELECT p.id, p.name, b.name AS brand, p.slug, p.status, p.fuel_type, p.ethanol_blend, p.model_year,
               p.price_min, p.price_max, p.verification_status, p.pros, p.cons, p.best_for
          FROM products p
          JOIN brands b ON b.id = p.brand_id
@@ -61,7 +61,7 @@ export async function GET(req: Request) {
       const missing = specKeys.filter((k) => spec[k] === null || spec[k] === undefined);
       if (onlyGaps && !missing.length) continue;
       body.push([
-        p.brand, p.name, p.slug, p.status, p.fuel_type ?? '', p.model_year ?? '',
+        p.brand, p.name, p.slug, p.status, p.fuel_type ?? '', p.ethanol_blend ?? '', p.model_year ?? '',
         p.price_min ?? '', p.price_max ?? '', p.verification_status ?? '', SPEC_SHEET_SOURCE,
         String(missing.length), missing.join('|'),
         ...specKeys.map((k) => spec[k] ?? ''),
