@@ -12,7 +12,7 @@ interface Props {
   initialB?: string;
 }
 
-const YRS = [3, 5, 7];
+const YRS = [3, 5, 7, 10];
 const CUSTOM = '__custom__';
 
 type Fuel = 'petrol' | 'electric' | 'cng';
@@ -225,15 +225,27 @@ function ResultCard({ bike, result, years }: { bike: BikeInfo | undefined; resul
         <Row k={result.energyName} v={inr(result.totalEnergy)} />
         <Row k={insuranceOff ? 'Insurance (excluded)' : 'Insurance renewals'} v={insuranceOff ? '—' : inr(result.totalInsurance)} />
         <Row k="Service" v={inr(result.totalService)} />
-        {result.batteryReplacementApplied && (
-          <Row k="Battery replacement (warranty expired)" v={inr(result.batteryReplacement)} />
+        {bike?.fuel === 'electric' && bike.batteryReplacement != null && bike.batteryReplacement > 0 && (
+          result.batteryReplacementApplied ? (
+            <>
+              <Row k="Battery replacement (warranty expired)" v={inr(result.batteryReplacement)} />
+              <p className="rounded-md bg-amber-50 px-2.5 py-1.5 text-[11px] leading-4 text-amber-900 ring-1 ring-amber-100">
+                Battery warranty ends inside this period — the pack cost is added and resale value is reduced because a buyer must budget for a new battery.
+              </p>
+            </>
+          ) : (
+            <>
+              <Row
+                k={`Battery replacement (est. ${inr(bike.batteryReplacement)} · warranty ~${bike.batteryWarrantyYears ?? '?'} yrs)`}
+                v="Not due in this period"
+              />
+              <p className="rounded-md bg-slate-50 px-2.5 py-1.5 text-[11px] leading-4 text-ink-mute ring-1 ring-slate-100">
+                Recorded battery replacement cost shown for reference — it is not added here because the warranty outlasts this {years}-year period.
+              </p>
+            </>
+          )
         )}
         <Row k="Est. resale value" v={result.resaleValue ? inr(result.resaleValue) : '—'} />
-        {result.batteryReplacementApplied && (
-          <p className="rounded-md bg-amber-50 px-2.5 py-1.5 text-[11px] leading-4 text-amber-900 ring-1 ring-amber-100">
-            Battery warranty ends inside this period — resale value is reduced because the buyer must budget for a new pack.
-          </p>
-        )}
         <div className="rounded-md bg-emerald-50 px-2.5 py-1.5 ring-1 ring-emerald-100">
           <span className="font-semibold text-emerald-900">Net cost of ownership </span>
           <span className="text-emerald-900">({years} yr − resale): </span>
