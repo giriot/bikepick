@@ -46,7 +46,9 @@ export default async function OwnershipPage({ searchParams }: { searchParams: Re
     id: r.id,
     label: `${r.brand_name} ${r.name}`,
     body: r.body_type ?? null,
-    fuel: r.fuel_type === 'electric' ? 'electric' : 'petrol',
+    // CNG / bi-fuel (CNG+petrol) models surface as 'hybrid' here and are shown
+    // under a CNG group in the picker, priced per kg.
+    fuel: r.fuel_type === 'electric' ? 'electric' : (r.fuel_type === 'cng' || r.fuel_type === 'hybrid' || r.fuel_type === 'cng_petrol' ? 'hybrid' : 'petrol'),
     mileage: r.mileage_kmpl,
     range: r.real_world_range_km ?? r.claimed_range_km,
     battery: r.battery_capacity_kwh,

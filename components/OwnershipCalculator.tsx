@@ -32,7 +32,7 @@ interface BikeInfo {
 const toInfo = (b: CalcBike): BikeInfo => ({
   id: b.id,
   label: b.label,
-  fuel: b.fuel === 'electric' ? 'electric' : 'petrol',
+  fuel: b.fuel === 'electric' ? 'electric' : b.fuel === 'hybrid' ? 'cng' : 'petrol',
   price: b.price,
   mileage: b.mileage,
   range: b.range,
@@ -46,6 +46,7 @@ const EMPTY_CUSTOM: BikeInfo = { id: CUSTOM, label: '', fuel: 'petrol', price: n
 function BikePicker({ label, bikes, value, onChange }: { label: string; bikes: CalcBike[]; value: string; onChange: (id: string) => void }) {
   const petrol = bikes.filter((b) => b.fuel === 'petrol');
   const electric = bikes.filter((b) => b.fuel === 'electric');
+  const cng = bikes.filter((b) => b.fuel === 'hybrid');
   return (
     <label className="block">
       <span className="text-[12px] font-semibold uppercase tracking-wide text-ink-mute">{label}</span>
@@ -65,6 +66,13 @@ function BikePicker({ label, bikes, value, onChange }: { label: string; bikes: C
         {electric.length > 0 && (
           <optgroup label="Electric">
             {electric.map((b) => (
+              <option key={b.id} value={b.id}>{b.label}</option>
+            ))}
+          </optgroup>
+        )}
+        {cng.length > 0 && (
+          <optgroup label="CNG">
+            {cng.map((b) => (
               <option key={b.id} value={b.id}>{b.label}</option>
             ))}
           </optgroup>

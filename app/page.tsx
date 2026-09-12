@@ -114,7 +114,7 @@ export default async function HomePage() {
               const ids = parseProductIds(c.product_ids);
               if (ids.length < 2) return null;
               return (
-                <Link key={c.id} href={`/compare?ids=${ids.join(',')}`} className="card card-hover flex items-center justify-between gap-3 p-4">
+                <Link key={c.id} href={c.slug ? `/compare/${c.slug}` : `/compare?ids=${ids.join(',')}`} className="card card-hover flex items-center justify-between gap-3 p-4">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">{ids.length}-way comparison</p>
                     <p className="mt-1 text-sm font-semibold leading-snug">{c.title}</p>

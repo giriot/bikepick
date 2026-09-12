@@ -53,6 +53,8 @@ export default async function ProductPage({ params, searchParams }: Params) {
 
   const { product, variants, images, bike, ev, offers, reviews } = data;
   const isEv = product.fuel_type === 'electric';
+  const isCng = product.fuel_type === 'cng' || product.fuel_type === 'hybrid' || product.fuel_type === 'cng_petrol';
+  const fuelLabel = isEv ? 'Electric' : isCng ? 'CNG + Petrol' : 'Petrol';
 
   // On-road (approx.) shown next to ex-showroom — from researched variant on-road prices.
   const onRoadPrices = variants
@@ -548,7 +550,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
               vSpecMap={vSpecMap}
               modelSpec={isEv ? ev : bike}
               isEv={isEv}
-              fuelLabel={isEv ? 'Electric' : 'Petrol'}
+              fuelLabel={fuelLabel}
               priceFrom={product.price_min}
             />
           </section>
@@ -797,14 +799,15 @@ function priceModelGroup(p: any, fuelLabel: string) {
 }
 
 function BIKE_GROUPS(b: any, p: any, onRoadMin: number | null) {
+  const isCng = p?.fuel_type === 'cng' || p?.fuel_type === 'hybrid' || p?.fuel_type === 'cng_petrol';
   return [
-    priceModelGroup(p, 'Petrol'),
+    priceModelGroup(p, isCng ? 'CNG + Petrol' : 'Petrol'),
     { title: 'Engine & transmission', rows: [
       ['Engine type', b?.engine_type], ['Displacement', num(b?.engine_capacity_cc, 'cc')],
       ['Max power', b?.max_power_bhp ? `${b.max_power_bhp} bhp${b.max_power_rpm ? ` @ ${b.max_power_rpm} rpm` : ''}` : null],
       ['Max torque', b?.max_torque_nm ? `${b.max_torque_nm} Nm${b.max_torque_rpm ? ` @ ${b.max_torque_rpm} rpm` : ''}` : null],
       ['Transmission', b?.transmission], ['Clutch', b?.clutch], ['Gearbox', b?.gearbox],
-      ['Top speed', num(b?.top_speed_kmph, 'km/h')], ['Mileage (claimed)', num(b?.mileage_kmpl, 'kmpl')],
+      ['Top speed', num(b?.top_speed_kmph, 'km/h')], ['Mileage (claimed)', num(b?.mileage_kmpl, isCng ? 'km/kg (CNG)' : 'kmpl')],
       ['Fuel tank', num(b?.fuel_tank_l, 'L')],
     ] as [string, any][] },
     { title: 'Dimensions & weight', rows: [
