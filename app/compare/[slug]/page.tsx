@@ -32,10 +32,10 @@ export default async function SavedComparison({ params }: { params: { slug: stri
   }));
 
   const title = entities.map((e) => `${e.brand} ${e.name}`).join(' vs ');
+  // ComparisonView appends the title as the final breadcrumb itself.
   const crumbs = [
     { name: 'Home', url: '/' },
     { name: 'Compare', url: '/compare' },
-    { name: title, url: `/compare/${row.slug}` },
   ];
 
   return <ComparisonView entities={entities} picker={picker} ids={ids} title={title} crumbs={crumbs} weights={weights} />;
