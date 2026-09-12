@@ -75,7 +75,13 @@ export async function listProducts(f: ProductFilters = {}): Promise<{ items: Pro
     params.push(...cc.params);
   }
   if (f.fuel) { where.push('p.fuel_type = ?'); params.push(f.fuel); }
-  if (f.bodyType) { where.push('p.body_type = ?'); params.push(f.bodyType); }
+  if (f.bodyType === 'bike') {
+    // "bike" lock = everything except scooters (commuter / sport / street / …).
+    where.push("(p.body_type IS NULL OR p.body_type <> 'scooter')");
+  } else if (f.bodyType) {
+    where.push('p.body_type = ?');
+    params.push(f.bodyType);
+  }
   if (f.brand) {
     const brands = Array.isArray(f.brand) ? f.brand : [f.brand];
     if (brands.length) {

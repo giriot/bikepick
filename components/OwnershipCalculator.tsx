@@ -25,6 +25,8 @@ interface BikeInfo {
   mileage: number | null; // petrol: kmpl · cng: km/kg
   range: number | null;   // electric
   battery: number | null; // electric
+  batteryReplacement: number | null;
+  batteryWarrantyYears: number | null;
 }
 
 const toInfo = (b: CalcBike): BikeInfo => ({
@@ -35,9 +37,11 @@ const toInfo = (b: CalcBike): BikeInfo => ({
   mileage: b.mileage,
   range: b.range,
   battery: b.battery,
+  batteryReplacement: b.batteryReplacement,
+  batteryWarrantyYears: b.batteryWarrantyYears ?? null,
 });
 
-const EMPTY_CUSTOM: BikeInfo = { id: CUSTOM, label: '', fuel: 'petrol', price: null, mileage: null, range: null, battery: null };
+const EMPTY_CUSTOM: BikeInfo = { id: CUSTOM, label: '', fuel: 'petrol', price: null, mileage: null, range: null, battery: null, batteryReplacement: null, batteryWarrantyYears: null };
 
 function BikePicker({ label, bikes, value, onChange }: { label: string; bikes: CalcBike[]; value: string; onChange: (id: string) => void }) {
   const petrol = bikes.filter((b) => b.fuel === 'petrol');
@@ -213,7 +217,15 @@ function ResultCard({ bike, result, years }: { bike: BikeInfo | undefined; resul
         <Row k={result.energyName} v={inr(result.totalEnergy)} />
         <Row k={insuranceOff ? 'Insurance (excluded)' : 'Insurance renewals'} v={insuranceOff ? '—' : inr(result.totalInsurance)} />
         <Row k="Service" v={inr(result.totalService)} />
+        {result.batteryReplacementApplied && (
+          <Row k="Battery replacement (warranty expired)" v={inr(result.batteryReplacement)} />
+        )}
         <Row k="Est. resale value" v={result.resaleValue ? inr(result.resaleValue) : '—'} />
+        {result.batteryReplacementApplied && (
+          <p className="rounded-md bg-amber-50 px-2.5 py-1.5 text-[11px] leading-4 text-amber-900 ring-1 ring-amber-100">
+            Battery warranty ends inside this period — resale value is reduced because the buyer must budget for a new pack.
+          </p>
+        )}
         <div className="rounded-md bg-emerald-50 px-2.5 py-1.5 ring-1 ring-emerald-100">
           <span className="font-semibold text-emerald-900">Net cost of ownership </span>
           <span className="text-emerald-900">({years} yr − resale): </span>
@@ -284,6 +296,8 @@ export function OwnershipCalculator({ bikes, defaults, initialA, initialB }: Pro
       years, kmPerYear, petrolPrice, electricityPrice, cngPrice,
       chargingEfficiencyPercent: efficiency,
       includeInsurance,
+      batteryWarrantyYears: bike.batteryWarrantyYears,
+      batteryReplacementCost: bike.batteryReplacement,
     });
   };
   const resA = calc(bikeA);

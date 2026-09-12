@@ -21,19 +21,27 @@ const FAQ = [
   { question: 'Why is year-one insurance shown as included?', answer: 'First-year insurance is part of the on-road price. From year two, we assume you renew at about 45% of the first-year premium, because the own-damage component reduces as the vehicle ages. Untick "Include insurance" to exclude it from the estimate entirely.' },
   { question: 'What if a model is missing data?', answer: 'We never invent figures. If mileage, battery/range or price is not recorded, that line is shown as missing and the affected totals are excluded — you can still see everything we could calculate.' },
   { question: 'Is there a CNG option?', answer: 'Yes — choose "Custom vehicle" in either picker and set the fuel to CNG. Enter the ex-showroom price and the mileage in km per kg and the calculator treats energy as CNG, priced per kg. When a CNG model is added to the catalogue it will appear in the list automatically.' },
+  { question: 'How does battery warranty affect an EV\u2019s 5-year cost?', answer: 'If the battery warranty expires inside the period you select, we add the recorded battery-replacement cost to the total and reduce the estimated resale value by the same amount — a buyer has to budget for a new pack, so an EV out of warranty is worth noticeably less. If the warranty outlasts the period, no replacement is added.' },
 ];
 
 export default async function OwnershipPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const settings = await getSettings();
   const rows = await db.all<any>(
     `SELECT p.id, p.name, p.fuel_type, p.body_type, p.price_min, b.name AS brand_name,
-            bs.mileage_kmpl, es.claimed_range_km, es.real_world_range_km, es.battery_capacity_kwh
+            bs.mileage_kmpl, es.claimed_range_km, es.real_world_range_km, es.battery_capacity_kwh,
+            es.battery_warranty, es.est_battery_replacement_cost
        FROM products p JOIN brands b ON b.id = p.brand_id
        LEFT JOIN bike_specs bs ON bs.product_id = p.id AND bs.variant_id IS NULL
        LEFT JOIN ev_specs es ON es.product_id = p.id AND es.variant_id IS NULL
       WHERE p.status='published' AND p.deleted_at IS NULL
       ORDER BY p.popularity DESC`,
   );
+  // "8 years or 80,000 km" / "3 years" → leading number of years.
+  const parseWarrantyYears = (s: string | null | undefined): number | null => {
+    if (!s) return null;
+    const m = s.match(/(\d+(?:\.\d+)?)/);
+    return m ? Number(m[1]) : null;
+  };
   const bikes: CalcBike[] = rows.map((r: any) => ({
     id: r.id,
     label: `${r.brand_name} ${r.name}`,
@@ -43,7 +51,8 @@ export default async function OwnershipPage({ searchParams }: { searchParams: Re
     range: r.real_world_range_km ?? r.claimed_range_km,
     battery: r.battery_capacity_kwh,
     price: r.price_min,
-    batteryReplacement: null,
+    batteryReplacement: r.est_battery_replacement_cost,
+    batteryWarrantyYears: parseWarrantyYears(r.battery_warranty),
   }));
 
   const crumbs = [{ name: 'Home', url: '/' }, { name: 'Tools', url: '/tools' }, { name: 'Ownership cost', url: '/tools/ownership' }];

@@ -14,6 +14,7 @@ export interface CalcBike {
   battery: number | null;
   price: number | null;
   batteryReplacement: number | null; // recorded estimate for EV battery pack replacement
+  batteryWarrantyYears?: number | null; // EV battery warranty in years (parsed from text)
 }
 
 const FUEL_KEYS: FuelKey[] = ['petrol', 'electric', 'hybrid'];

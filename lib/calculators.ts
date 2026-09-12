@@ -218,6 +218,8 @@ export interface OwnershipInput {
   cngPrice?: number;                    // ₹/kg
   chargingEfficiencyPercent?: number;   // default 85
   includeInsurance?: boolean;           // default true — set false to ignore insurance
+  batteryWarrantyYears?: number | null; // electric only — years of battery warranty
+  batteryReplacementCost?: number | null; // electric only — ₹ to replace the pack
 }
 
 export interface OwnershipYear {
@@ -240,6 +242,8 @@ export interface OwnershipResult {
   totalEnergy: number;
   totalInsurance: number;
   totalService: number;
+  batteryReplacement: number;           // ₹ (EV only, when the warranty expires inside the period)
+  batteryReplacementApplied: boolean;   // whether a battery replacement was added
   totalCost: number;                    // purchase + running over the period
   costPerKm: number | null;             // totalCost / total km
   costPerMonth: number;                 // totalCost / (years*12)
@@ -317,13 +321,30 @@ export function ownershipCost(i: OwnershipInput): OwnershipResult {
   const totalEnergy = energyPerYear * years;
   const totalInsurance = insuranceRenewal * (years - 1);
   const totalService = servicePerYear * years;
-  const totalCost = (onRoadPrice ?? 0) + totalEnergy + totalInsurance + totalService;
 
-  // Resale: same depreciation curve as the used-price estimator.
+  // EV deep-analysis: a battery pack outlived by its warranty is a real cost.
+  // If the battery warranty expires inside the ownership period, add the
+  // replacement cost (when recorded) to the total, and reduce resale by the
+  // same amount — a buyer must factor in a new pack, so the bike is worth less.
+  let batteryReplacement = 0;
+  let batteryReplacementApplied = false;
+  if (i.fuel === 'electric' && i.batteryReplacementCost != null && i.batteryReplacementCost > 0) {
+    const warranty = i.batteryWarrantyYears;
+    if (warranty != null && years > warranty) {
+      batteryReplacement = Math.round(i.batteryReplacementCost);
+      batteryReplacementApplied = true;
+    }
+  }
+
+  const totalCost = (onRoadPrice ?? 0) + totalEnergy + totalInsurance + totalService + batteryReplacement;
+
+  // Resale: same depreciation curve as the used-price estimator, with the EV
+  // battery adjustment applied on top when the pack is at end of warranty.
   let resaleValue: number | null = null;
   if (i.price != null && i.price > 0) {
     const curve = projectResale(i.price, years);
     resaleValue = curve[curve.length - 1].value;
+    if (batteryReplacementApplied) resaleValue = Math.max(0, resaleValue - batteryReplacement);
   }
 
   const totalKm = kmPerYear * years;
@@ -342,6 +363,18 @@ export function ownershipCost(i: OwnershipInput): OwnershipResult {
   else if (i.fuel === 'electric') assumptions.unshift(`Electricity at ₹${electricityPrice}/unit with ${Math.round(eff * 100)}% charging efficiency over ${i.rangeKm ?? '—'} km range.`);
   else assumptions.unshift(`CNG at ₹${cngPrice}/kg with the recorded ${i.cngMileage ?? '—'} km/kg.`);
 
+  if (i.fuel === 'electric') {
+    if (batteryReplacementApplied) {
+      assumptions.push(
+        `Battery warranty (~${i.batteryWarrantyYears} years) expires within this period — a ₹${batteryReplacement.toLocaleString('en-IN')} battery replacement is added, and resale is reduced by the same amount.`,
+      );
+    } else if (i.batteryReplacementCost != null && i.batteryReplacementCost > 0) {
+      assumptions.push(`Battery warranty (~${i.batteryWarrantyYears ?? '?'} years) outlasts the ${years}-year period — no replacement cost added.`);
+    } else {
+      assumptions.push('Battery replacement cost is not recorded — not included; check the manufacturer warranty before buying.');
+    }
+  }
+
   return {
     onRoadPrice,
     energyPerKm: energyPerKm == null ? null : round2(energyPerKm),
@@ -353,6 +386,8 @@ export function ownershipCost(i: OwnershipInput): OwnershipResult {
     totalEnergy,
     totalInsurance,
     totalService,
+    batteryReplacement,
+    batteryReplacementApplied,
     totalCost,
     costPerKm: totalKm > 0 ? round2(totalCost / totalKm) : null,
     costPerMonth: Math.round(totalCost / (years * 12)),

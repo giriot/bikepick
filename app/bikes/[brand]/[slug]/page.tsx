@@ -109,17 +109,20 @@ export default async function ProductPage({ params, searchParams }: Params) {
   // "Segment" = engine capacity for petrol (cc), usable range for electric (km).
   // Same-segment peers are matched on that, never on price alone, so a 125 cc
   // bike is compared with other ~125 cc bikes (not, say, 160 cc machines).
+  const isScooter = product.body_type === 'scooter';
+  // Body-type scope: a scooter page only suggests scooters, a bike page only bikes.
+  const bodyScope = isScooter ? "p.body_type = 'scooter'" : "p.body_type <> 'scooter'";
   const segCc = !isEv && bike?.engine_capacity_cc != null ? Number(bike.engine_capacity_cc) : null;
   const segRange = isEv ? Number(ev?.claimed_range_km ?? ev?.real_world_range_km ?? 0) || null : null;
   const segPeers = segCc != null
     ? await db.all<any>(
-        `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type,
+        `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type, p.body_type,
                 b.name AS brand_name, b.slug AS brand_slug
            FROM products p
            JOIN brands b ON b.id = p.brand_id
            JOIN bike_specs bs ON bs.product_id = p.id AND bs.variant_id IS NULL
           WHERE p.status = 'published' AND p.deleted_at IS NULL
-            AND p.fuel_type = 'petrol' AND p.id <> ?
+            AND p.fuel_type = 'petrol' AND p.id <> ? AND ${bodyScope}
             AND bs.engine_capacity_cc IS NOT NULL
             AND bs.engine_capacity_cc >= ? AND bs.engine_capacity_cc <= ?
           ORDER BY p.price_min ASC LIMIT 8`,
@@ -127,13 +130,13 @@ export default async function ProductPage({ params, searchParams }: Params) {
       )
     : segRange != null
       ? await db.all<any>(
-          `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type,
+          `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type, p.body_type,
                   b.name AS brand_name, b.slug AS brand_slug
              FROM products p
              JOIN brands b ON b.id = p.brand_id
              JOIN ev_specs es ON es.product_id = p.id AND es.variant_id IS NULL
             WHERE p.status = 'published' AND p.deleted_at IS NULL
-              AND p.fuel_type = 'electric' AND p.id <> ?
+              AND p.fuel_type = 'electric' AND p.id <> ? AND ${bodyScope}
               AND COALESCE(es.claimed_range_km, es.real_world_range_km) IS NOT NULL
               AND COALESCE(es.claimed_range_km, es.real_world_range_km) >= ?
               AND COALESCE(es.claimed_range_km, es.real_world_range_km) <= ?
@@ -143,11 +146,46 @@ export default async function ProductPage({ params, searchParams }: Params) {
       : [];
   const segmentHasOthers = segPeers.length > 0;
   const cheaper = product.price_min != null
-    ? segPeers.filter((s) => s.price_min != null && s.price_min < (product.price_min as number)).slice(0, 2)
+    ? segPeers.filter((s) => s.price_min != null && s.price_min < (product.price_min as number)).slice(0, 3)
     : [];
   const segLabel = isEv
     ? (segRange != null ? `EVs · ~${Math.round(segRange)} km range` : 'this segment')
-    : (segCc != null ? `~${Math.round(segCc)} cc bikes` : 'this segment');
+    : (segCc != null ? `~${Math.round(segCc)} cc ${isScooter ? 'scooters' : 'bikes'}` : 'this segment');
+
+  // "EVs to check at the same mileage" — up to 2 electric models (same body
+  // type where possible) as a cross-fuel alternative. Petrol pages only.
+  let evSuggest: any[] = [];
+  if (!isEv) {
+    evSuggest = await db.all<any>(
+      `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type, p.body_type,
+              b.name AS brand_name, b.slug AS brand_slug,
+              COALESCE(es.claimed_range_km, es.real_world_range_km) AS range_km
+         FROM products p
+         JOIN brands b ON b.id = p.brand_id
+         JOIN ev_specs es ON es.product_id = p.id AND es.variant_id IS NULL
+        WHERE p.status = 'published' AND p.deleted_at IS NULL
+          AND p.fuel_type = 'electric' AND ${bodyScope}
+        ORDER BY p.popularity DESC LIMIT 2`,
+    );
+    if (evSuggest.length === 0) {
+      evSuggest = await db.all<any>(
+        `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type, p.body_type,
+                b.name AS brand_name, b.slug AS brand_slug,
+                COALESCE(es.claimed_range_km, es.real_world_range_km) AS range_km
+           FROM products p
+           JOIN brands b ON b.id = p.brand_id
+           JOIN ev_specs es ON es.product_id = p.id AND es.variant_id IS NULL
+          WHERE p.status = 'published' AND p.deleted_at IS NULL
+            AND p.fuel_type = 'electric'
+          ORDER BY p.popularity DESC LIMIT 2`,
+      );
+    }
+  }
+
+  // Similar models (below gallery) — same body type only; fall back to any.
+  const similarAll = (similar.items || []).filter((s) => s.id !== product.id);
+  const similarScoped = similarAll.filter((s) => (isScooter ? s.body_type === 'scooter' : s.body_type !== 'scooter'));
+  const similarList = (similarScoped.length ? similarScoped : similarAll).slice(0, 4);
   const approvedReviews = reviews;
   const avgRating = approvedReviews.length
     ? approvedReviews.reduce((a: number, r: any) => a + r.rating, 0) / approvedReviews.length
@@ -186,13 +224,13 @@ export default async function ProductPage({ params, searchParams }: Params) {
             />
 
             {/* Below the gallery: editorial highlights only (no repeated specs) —
-                Similar models → Pros & cons → Suitable for. Value & running-cost
-                numbers live in the dedicated panel next to the price. */}
+                Similar models → Pros & cons. Suitable for and value numbers live
+                in the panel next to the price. */}
             <div className="mt-5 space-y-4">
               <div>
-                <h3 className="text-[13.5px] font-semibold">Similar models</h3>
+                <h3 className="text-[13.5px] font-semibold">Similar {isScooter ? 'scooters' : 'bikes'}</h3>
                 <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-white">
-                  {similar.items.filter((s) => s.id !== product.id).slice(0, 4).map((s) => (
+                  {similarList.map((s) => (
                     <li key={s.id} className="flex items-center gap-3 p-2.5">
                       <Image src={s.image_url || '/media/commuter.svg'} alt="" width={56} height={36} className="h-9 w-14 shrink-0 object-contain" />
                       <div className="min-w-0 flex-1">
@@ -225,28 +263,6 @@ export default async function ProductPage({ params, searchParams }: Params) {
                 ) : (
                   <p className="mt-1.5 text-[11.5px] leading-5 text-ink-mute">
                     Not recorded yet — our editorial team is reviewing this model.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <h3 className="text-[13.5px] font-semibold">Suitable for</h3>
-                {bestFor.length > 0 ? (
-                  <div className="mt-2 rounded-xl border border-brand-100 bg-brand-50/70 p-3">
-                    <div className="flex flex-wrap gap-2">
-                      {bestFor.map((b) => (
-                        <span
-                          key={b}
-                          className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12.5px] font-semibold text-brand-800 shadow-sm ring-1 ring-brand-200"
-                        >
-                          <span className="text-brand-500">✓</span>{b}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-1.5 text-[11.5px] leading-5 text-ink-mute">
-                    Which riders this model suits best will appear here once the editorial team records it.
                   </p>
                 )}
               </div>
@@ -425,6 +441,31 @@ export default async function ProductPage({ params, searchParams }: Params) {
                     </div>
                   ) : null}
 
+                  {/* EVs to check at the same mileage (cross-fuel suggestion) */}
+                  {evSuggest.length > 0 && (
+                    <div className="mt-2.5 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-brand-700">⚡ EVs to check at same mileage</p>
+                      <ul className="mt-1.5 space-y-1.5">
+                        {evSuggest.map((s) => (
+                          <li key={s.id} className="flex items-center justify-between gap-2 text-[12px]">
+                            <Link
+                              href={`/electric/${s.brand_slug}/${s.slug}`}
+                              className="min-w-0 truncate font-medium hover:text-brand-600 hover:underline"
+                            >
+                              {s.brand_name} {s.name}
+                            </Link>
+                            <span className="shrink-0 text-right">
+                              <span className="font-bold text-brand-700">{inr(s.price_min)}</span>
+                              {s.range_km != null && (
+                                <span className="ml-1 text-[10px] text-ink-mute">~{Math.round(s.range_km)} km</span>
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   <p className="mt-2.5 text-[10px] leading-4 text-ink-mute">
                     {isEv ? 'Assumes a healthy battery. ' : ''}Depreciation uses a standard two-wheeler curve and today&apos;s
                     ex-showroom price — indicative only, not a guaranteed buyback.
@@ -432,6 +473,27 @@ export default async function ProductPage({ params, searchParams }: Params) {
                 </div>
               </section>
             )}
+
+            {/* Suitable for — moved to the price side for prominence */}
+            <section className="mt-5 rounded-2xl border border-line bg-white p-4 shadow-card">
+              <h2 className="text-[12px] font-semibold uppercase tracking-wide text-ink-mute">Suitable for</h2>
+              {bestFor.length > 0 ? (
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {bestFor.map((b) => (
+                    <span
+                      key={b}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12.5px] font-semibold text-brand-800 shadow-sm ring-1 ring-brand-200"
+                    >
+                      <span className="text-brand-500">✓</span>{b}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-[11.5px] leading-5 text-ink-mute">
+                  Which riders this model suits best will appear here once the editorial team records it.
+                </p>
+              )}
+            </section>
 
             {/* Actions — all real, compact */}
             <div className="mt-5 grid grid-cols-2 gap-2">

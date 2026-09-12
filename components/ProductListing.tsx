@@ -1,9 +1,11 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
 import { listProducts, categoryClause, type ProductFilters } from '@/lib/queries';
 import { ProductCard } from '@/components/ProductCard';
 import { Filters, SortSelect } from '@/components/Filters';
+import { BodyTypeLock } from '@/components/BodyTypeLock';
 import { Breadcrumbs, Empty, Pagination } from '@/components/ui';
 import { AdSlot } from '@/components/AdSlot';
 
@@ -30,10 +32,16 @@ export async function ProductListing({ category, title, intro, searchParams }: L
   const one = (k: string) => (Array.isArray(sp[k]) ? (sp[k] as string[])[0] : (sp[k] as string | undefined)) || undefined;
   const many = (k: string) => (Array.isArray(sp[k]) ? (sp[k] as string[]) : sp[k] ? [sp[k] as string] : []);
 
+  // Body-type lock: the "Show: Bike / Scooter" toggle stores its choice in a
+  // cookie; read it here so the lock applies server-side (and persists).
+  const lock = cookies().get('bt_lock')?.value;
+  const lockVal: 'all' | 'bike' | 'scooter' = lock === 'bike' || lock === 'scooter' ? lock : 'all';
+  const urlBody = one('bodyType');
+
   const filters: ProductFilters = {
     category,
     brand: many('brand'),
-    bodyType: one('bodyType'),
+    bodyType: urlBody || (lockVal !== 'all' ? lockVal : undefined),
     minPrice: one('minPrice') ? Number(one('minPrice')) : undefined,
     maxPrice: one('maxPrice') ? Number(one('maxPrice')) : undefined,
     minCc: one('minCc') ? Number(one('minCc')) : undefined,
@@ -83,6 +91,10 @@ export async function ProductListing({ category, title, intro, searchParams }: L
           <p className="mt-1.5 max-w-2xl text-sm leading-6 text-ink-mute">{intro}</p>
         </div>
         <Suspense fallback={null}><SortSelect options={category === 'electric' ? EV_SORTS : SORTS} /></Suspense>
+      </div>
+
+      <div className="mt-4">
+        <BodyTypeLock initial={lockVal} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[268px_1fr]">

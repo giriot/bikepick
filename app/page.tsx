@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
 import { listProducts, listUsedBikes, getStats } from '@/lib/queries';
 import { getSettings, isOn } from '@/lib/settings';
@@ -15,11 +16,16 @@ export const maxDuration = 60;
 
 export default async function HomePage() {
   const settings = await getSettings();
+  // Honour the "Show: Bike / Scooter" lock on the homepage too, so a visitor
+  // who locked to "Bike" only sees bikes everywhere (until they release it).
+  const lock = cookies().get('bt_lock')?.value;
+  const lockVal: 'all' | 'bike' | 'scooter' = lock === 'bike' || lock === 'scooter' ? lock : 'all';
+  const lockFilter = lockVal !== 'all' ? { bodyType: lockVal } : {};
 
   const [trending, evs, priceDrops, usedBikes, offers, guides, comparisons, stats] = await Promise.all([
-    listProducts({ category: 'bikes', sort: 'popular', perPage: 8 }),
-    listProducts({ category: 'electric', sort: 'popular', perPage: 8 }),
-    listProducts({ sort: 'price_low', perPage: 4 }),
+    listProducts({ category: 'bikes', sort: 'popular', perPage: 8, ...lockFilter }),
+    listProducts({ category: 'electric', sort: 'popular', perPage: 8, ...lockFilter }),
+    listProducts({ sort: 'price_low', perPage: 4, ...lockFilter }),
     listUsedBikes({ sort: 'trust', perPage: 4 }),
     db.all<any>(
       `SELECT o.*, d.business_name, d.city AS dealer_city, p.name AS product_name, p.slug AS product_slug,
