@@ -157,18 +157,23 @@ export default async function ProductPage({ params, searchParams }: Params) {
 
   // EVs to consider as a cross-fuel alternative, matched by ex-showroom price:
   //
-  //   • Performance bikes (200 cc+) — EV motorcycles nearest this bike's
-  //     ex-showroom price (the buyer is shopping a budget, not a fuel type).
-  //   • Commuters & scooters in the 50–80 kmpl band — EV scooters nearest
-  //     this bike's ex-showroom price.
+  //   • Performance bikes (200 cc+) — EV motorcycles within ±10% of this
+  //     bike's ex-showroom price (the buyer shops a budget, not a fuel type).
+  //   • Commuters & scooters in the 50–80 kmpl band — EV scooters within
+  //     ±10% of this bike's ex-showroom price.
+  // If the band is empty, the nearest-priced EVs are shown with an honest gap.
   // Petrol pages only.
+  const BAND_FRACTION = 0.1;
   const bikeKmpL = !isEv ? Number(bike?.mileage_kmpl || 0) || null : null;
   const bikeCc = !isEv ? Number(bike?.engine_capacity_cc || 0) || null : null;
   const bikePrice = !isEv ? (Number(product.price_min) > 0 ? Number(product.price_min) : null) : null;
   const isPerformance = bikeCc != null && bikeCc > 200;
   const evBand = bikeKmpL != null && bikeKmpL >= 50 && bikeKmpL <= 80;
+  const bandLo = bikePrice != null ? Math.floor((bikePrice * (1 - BAND_FRACTION)) / 1000) * 1000 : null;
+  const bandHi = bikePrice != null ? Math.ceil((bikePrice * (1 + BAND_FRACTION)) / 1000) * 1000 : null;
   let evSuggest: any[] = [];
   let evMode: 'bike' | 'scooter' = 'scooter';
+  let evBandHits = 0;
   if (!isEv && bikePrice != null && (isPerformance || evBand)) {
     const evs = await db.all<any>(
       `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type, p.body_type,
@@ -193,26 +198,26 @@ export default async function ProductPage({ params, searchParams }: Params) {
       return null;
     };
 
-    // Price match: closest ex-showroom price wins (ties broken by lower price).
+    // Price-band match: EVs within ±10% of this bike's ex-showroom price.
     const priced = evs
       .filter((r: any) => Number(r.price_min) > 0)
       .map((r: any) => ({ ...r, price: Number(r.price_min), cost_km: evCostKm(r) }));
     const byPrice = (a: any, b: any) =>
       Math.abs(a.price - (bikePrice as number)) - Math.abs(b.price - (bikePrice as number));
 
-    if (isPerformance) {
-      // EV motorcycles nearest in price; fall back to any EV if none listed.
-      const cycles = priced.filter((r) => r.body_type !== 'scooter');
-      const pool = cycles.length ? cycles : priced;
-      evSuggest = [...pool].sort(byPrice).slice(0, 2);
-      evMode = 'bike';
-    } else {
-      // EV scooters nearest in price; fall back to any EV if none listed.
-      const scooters = priced.filter((r) => r.body_type === 'scooter');
-      const pool = scooters.length ? scooters : priced;
-      evSuggest = [...pool].sort(byPrice).slice(0, 2);
-      evMode = 'scooter';
-    }
+    // Body-type scope: EV motorcycles for 200 cc+ bikes, EV scooters otherwise.
+    const scoped = isPerformance
+      ? priced.filter((r) => r.body_type !== 'scooter')
+      : priced.filter((r) => r.body_type === 'scooter');
+    const pool = scoped.length ? scoped : priced;
+
+    const lo = bikePrice * (1 - BAND_FRACTION);
+    const hi = bikePrice * (1 + BAND_FRACTION);
+    const inBand = pool.filter((r) => r.price >= lo && r.price <= hi).sort(byPrice);
+    const outside = pool.filter((r) => r.price < lo || r.price > hi).sort(byPrice);
+    evBandHits = inBand.length;
+    evSuggest = [...inBand, ...outside].slice(0, 3);
+    evMode = isPerformance ? 'bike' : 'scooter';
   }
 
   // Similar models (below gallery) — same body type only; fall back to any.
@@ -496,8 +501,8 @@ export default async function ProductPage({ params, searchParams }: Params) {
                     <div className="mt-2.5 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2.5">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-brand-700">
                         ⚡ {evMode === 'bike'
-                          ? 'EV motorcycles at a similar ex-showroom price'
-                          : 'EV scooters at a similar ex-showroom price'}
+                          ? `EV motorcycles near ${inr(bikePrice ?? 0)} ex-showroom`
+                          : `EV scooters near ${inr(bikePrice ?? 0)} ex-showroom`}
                       </p>
                       <ul className="mt-1.5 space-y-1.5">
                         {evSuggest.map((s) => {
@@ -527,9 +532,9 @@ export default async function ProductPage({ params, searchParams }: Params) {
                         })}
                       </ul>
                       <p className="mt-1.5 text-[10px] leading-4 text-ink-mute">
-                        {evMode === 'bike'
-                          ? `This ${Math.round(bikeCc ?? 0)} cc bike is ${inr(bikePrice ?? 0)} ex-showroom — the EVs above are its closest price match, with honest ≈₹/km running costs.`
-                          : `This ${isScooter ? 'scooter' : 'bike'} is ${inr(bikePrice ?? 0)} ex-showroom — the EVs above are its closest price match, with honest ≈₹/km running costs.`}
+                        {evBandHits > 0
+                          ? `Picked from EVs priced within ±10% of this ${isScooter ? 'scooter' : 'bike'} (${inr(bandLo ?? 0)}–${inr(bandHi ?? 0)} ex-showroom), with honest ≈₹/km running costs.`
+                          : `No EV on Bikepick is priced within ±10% of this ${isScooter ? 'scooter' : 'bike'} yet — nearest-priced EVs shown with the gap.`}
                       </p>
                     </div>
                   )}
