@@ -100,8 +100,8 @@ export default async function HomePage() {
             />
             <CategoryCard
               href="/ethanol" title="Ethanol"
-              body="Ethanol-blend capability for every petrol model — E20-ready today, flex-fuel E85/E100 as it arrives in India."
-              cta={stats.flexfuels > 0 ? `${stats.flexfuels} flex-fuel` : 'E20–E100'} art="/media/cat-ethanol.jpg" tone="brand" cover
+              body="Flex-fuel motorcycles that run on high ethanol blends — E85 and E100 — listed only when the manufacturer certifies it."
+              cta={stats.flexfuels > 0 ? `${stats.flexfuels} flex-fuel` : 'E85–E100'} art="/media/cat-ethanol.jpg" tone="brand" cover
             />
           </div>
         </div>

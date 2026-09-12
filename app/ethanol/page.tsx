@@ -6,11 +6,11 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export const metadata = buildMetadata({
-  title: 'Ethanol-Ready & Flex-Fuel Bikes in India — E20, E85, E100',
+  title: 'Flex-Fuel Bikes in India — E85 & E100 Ethanol Motorcycles',
   description:
-    'Which Indian bikes run on ethanol-blended petrol? Every new petrol bike is E20-ready by the BS6 Phase 2 mandate; flex-fuel E85/E100 models are just arriving. Compare them here.',
+    'Motorcycles that run on high-ethanol blends E85 and E100 (flex-fuel), not just E20. A model is listed here only when its flex-fuel capability is recorded — never a plain E20 bike.',
   path: '/ethanol',
-  keywords: ['e20 bike india', 'ethanol bike', 'flex fuel bike india', 'e85 bike', 'e100 bike', 'ethanol petrol bike'],
+  keywords: ['flex fuel bike india', 'e85 bike', 'e100 bike', 'ethanol motorcycle india', 'e85 petrol bike'],
 });
 
 export default function EthanolPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
@@ -20,8 +20,8 @@ export default function EthanolPage({ searchParams }: { searchParams: Record<str
       <Suspense fallback={<div className="container-xl py-10"><div className="skeleton h-96" /></div>}>
         <ProductListing
           category="ethanol"
-          title="Ethanol-ready bikes"
-          intro="Every new petrol two-wheeler sold in India since April 2023 is E20-ready by the BS6 Phase 2 mandate — E20 (20% ethanol) is now the standard fuel. Flex-fuel models that run E85/E100 are shown first."
+          title="Flex-fuel bikes (E85–E100)"
+          intro="Flex-fuel motorcycles run on any ethanol blend from E20 up to E85 or E100 (100% ethanol). India's first flex-fuel bikes are only just launching — a model appears here only when its flex-fuel rating is recorded. E20-ready bikes are marked on their own pages instead."
           searchParams={searchParams}
         />
       </Suspense>

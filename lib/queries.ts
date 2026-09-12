@@ -66,7 +66,10 @@ export function categoryClause(slug: string): { sql: string; params: string[] } 
   if (slug === 'bikes') return { sql: "c.slug IN ('motorcycle','scooter')", params: [] };
   if (slug === 'electric') return { sql: "c.slug IN ('electric-scooter','electric-motorcycle')", params: [] };
   if (slug === 'hybrid') return { sql: "p.fuel_type IN ('cng','hybrid','cng_petrol')", params: [] };
-  if (slug === 'ethanol') return { sql: "(p.ethanol_blend IS NOT NULL AND p.ethanol_blend <> 'none')", params: [] };
+  // Ethanol category = flex-fuel only (E85/E100). E20-ready is the default for
+  // every new petrol model and is marked on its card/specs, not listed here —
+  // we never present a plain E20 bike as a flex-fuel machine.
+  if (slug === 'ethanol') return { sql: "p.ethanol_blend IN ('e85','e100')", params: [] };
   return { sql: 'c.slug = ?', params: [slug] };
 }
 
