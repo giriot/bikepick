@@ -177,6 +177,7 @@ export function SpecSheetForm({ productId, fuelType, initial, variantId, variant
         <Num name="max_torque_rpm" label="Max torque at" unit="rpm" value={initial.max_torque_rpm} />
         <Num name="top_speed_kmph" label="Top speed" unit="km/h" value={initial.top_speed_kmph} />
         <Num name="mileage_kmpl" label="Mileage (claimed)" unit="km/l" value={initial.mileage_kmpl} />
+        <Num name="real_world_mileage_kmpl" label="Mileage (real-world)" unit="km/l" value={initial.real_world_mileage_kmpl} />
         <Num name="fuel_tank_l" label="Fuel tank" unit="L" value={initial.fuel_tank_l} />
         <Sel name="transmission" label="Transmission" value={initial.transmission} options={TRANSMISSIONS} />
         <Sel name="clutch" label="Clutch" value={initial.clutch} options={CLUTCHES} />

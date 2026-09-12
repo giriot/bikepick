@@ -3,7 +3,7 @@
 
 export const BIKE_SPEC_KEYS = [
   'engine_type', 'engine_capacity_cc', 'max_power_bhp', 'max_power_rpm', 'max_torque_nm', 'max_torque_rpm',
-  'transmission', 'clutch', 'gearbox', 'top_speed_kmph', 'mileage_kmpl', 'fuel_tank_l',
+  'transmission', 'clutch', 'gearbox', 'top_speed_kmph', 'mileage_kmpl', 'real_world_mileage_kmpl', 'fuel_tank_l',
   'length_mm', 'width_mm', 'height_mm', 'wheelbase_mm', 'seat_height_mm', 'ground_clearance_mm', 'kerb_weight_kg',
   'front_tyre', 'rear_tyre', 'front_brake', 'rear_brake', 'abs_type', 'cbs', 'traction_control',
   'suspension_front', 'suspension_rear', 'wheel_type', 'headlight', 'tail_light', 'drl', 'instrument_cluster',
@@ -21,7 +21,7 @@ export const EV_SPEC_KEYS = [
 
 export const NUMERIC_BIKE: Set<string> = new Set([
   'engine_capacity_cc', 'max_power_bhp', 'max_power_rpm', 'max_torque_nm', 'max_torque_rpm',
-  'top_speed_kmph', 'mileage_kmpl', 'fuel_tank_l', 'length_mm', 'width_mm', 'height_mm',
+  'top_speed_kmph', 'mileage_kmpl', 'real_world_mileage_kmpl', 'fuel_tank_l', 'length_mm', 'width_mm', 'height_mm',
   'wheelbase_mm', 'seat_height_mm', 'ground_clearance_mm', 'kerb_weight_kg', 'service_interval_km', 'est_service_cost',
 ]);
 export const BOOL_BIKE: Set<string> = new Set([

@@ -33,6 +33,51 @@ export interface SearchResult {
   didYouMean: string | null;
 }
 
+/** A specification facet — a shorthand query (e.g. "e100", "abs", "160cc") that
+ *  matches bikes by a recorded spec rather than by name. */
+interface SpecFacet {
+  label: string;
+  joins: string;
+  where: string;
+}
+
+const BS = 'JOIN bike_specs bs ON bs.product_id = p.id AND bs.variant_id IS NULL';
+
+function detectSpecFacet(q: string): SpecFacet | null {
+  const s = q.trim().toLowerCase();
+  if (/\be100\b/.test(s)) return { label: 'E100 flex-fuel', joins: '', where: "p.ethanol_blend = 'e100'" };
+  if (/\be85\b/.test(s)) return { label: 'E85/E100 flex-fuel', joins: '', where: "p.ethanol_blend IN ('e85','e100')" };
+  if (/\b(e20|ethanol)\b/.test(s)) return { label: 'E20 ready', joins: '', where: "p.ethanol_blend = 'e20'" };
+  if (/\babs\b/.test(s)) return { label: 'ABS', joins: BS, where: "bs.abs_type IS NOT NULL AND bs.abs_type <> ''" };
+  if (/\bdisc\b/.test(s)) return { label: 'Disc brake', joins: BS, where: "(bs.front_brake LIKE '%disc%' OR bs.rear_brake LIKE '%disc%')" };
+  if (/\bdrum\b/.test(s)) return { label: 'Drum brake', joins: BS, where: "(bs.front_brake LIKE '%drum%' OR bs.rear_brake LIKE '%drum%')" };
+  if (/\bled\b/.test(s)) return { label: 'LED lights', joins: BS, where: "(bs.headlight LIKE '%led%' OR bs.tail_light LIKE '%led%')" };
+  if (/\b(cng|hybrid)\b/.test(s)) return { label: 'CNG / Hybrid', joins: '', where: "p.fuel_type IN ('cng','hybrid','cng_petrol')" };
+  if (/\b(electric|ev)\b/.test(s)) return { label: 'Electric', joins: '', where: "p.fuel_type = 'electric'" };
+  const cc = s.match(/(\d{2,4})\s*cc\b/);
+  if (cc) {
+    const n = Number(cc[1]);
+    return { label: `≈${cc[1]} cc`, joins: BS, where: `bs.engine_capacity_cc BETWEEN ${Math.round(n * 0.95)} AND ${Math.round(n * 1.05)}` };
+  }
+  return null;
+}
+
+const facetProductRows = async (facet: SpecFacet, limit: number) =>
+  db.all<any>(
+    `SELECT p.id, p.name, p.slug, p.fuel_type, p.price_min, p.score, p.normalized_key,
+            b.name AS brand_name, b.slug AS brand_slug, c.slug AS category_slug,
+            (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.approved = 1
+              ORDER BY pi.is_primary DESC, pi.sort_order LIMIT 1) AS image_url
+       FROM products p
+       JOIN brands b ON b.id = p.brand_id
+       JOIN categories c ON c.id = p.category_id
+       ${facet.joins}
+      WHERE p.status = 'published' AND p.deleted_at IS NULL AND ${facet.where}
+      ORDER BY p.popularity DESC, p.score DESC
+      LIMIT ?`,
+    [limit],
+  );
+
 /**
  * Database-backed global search.
  *
@@ -123,9 +168,31 @@ export async function globalSearch(query: string, limitPerGroup = 6): Promise<Se
       .sort((a, b) => b.rank - a.rank);
   }
 
-  const productHits = [...literalProductHits, ...fuzzyProductHits].slice(0, limitPerGroup);
+  let productHits = [...literalProductHits, ...fuzzyProductHits].slice(0, limitPerGroup);
   const didYouMean =
     literalProductHits.length === 0 && fuzzyProductHits.length > 0 ? fuzzyProductHits[0].title : null;
+
+  // Specification facets ("e100", "abs", "disc", "led", "160cc"…) match by
+  // recorded spec rather than name, so a spec search is never empty.
+  const facet = detectSpecFacet(q);
+  if (facet) {
+    const facetRows = await facetProductRows(facet, limitPerGroup);
+    const ids = new Set(productHits.map((h) => h.id));
+    for (const r of facetRows) {
+      if (productHits.length >= limitPerGroup) break;
+      if (ids.has(r.id)) continue;
+      ids.add(r.id);
+      productHits.push({
+        id: r.id,
+        title: displayName(r.brand_name, r.name),
+        subtitle: facet.label,
+        url: `/${r.fuel_type === 'electric' ? 'electric' : 'bikes'}/${r.brand_slug}/${r.slug}`,
+        image: r.image_url,
+        meta: r.price_min ? `₹${Math.round(r.price_min).toLocaleString('en-IN')} onwards, ex-showroom` : null,
+        rank: 20,
+      });
+    }
+  }
 
   const used = await db.all<any>(
     `SELECT u.id, u.slug, u.brand_name, u.model_name, u.manufacture_year, u.km_driven, u.city,
@@ -223,6 +290,32 @@ export async function suggest(query: string, limit = 8): Promise<{ label: string
       url: `/${r.fuel_type === 'electric' ? 'electric' : 'bikes'}/${r.brand_slug}/${r.slug}`,
       kind: 'product',
     }));
+
+  // Specification facet matches ("e100" → flex-fuel bikes, "abs" → ABS bikes…),
+  // labelled with the spec so the dropdown explains why they appear.
+  const facet = detectSpecFacet(q);
+  if (facet) {
+    const seen = new Set(out.map((o) => o.label));
+    const rowsF = await db.all<any>(
+      `SELECT p.name, p.slug, p.fuel_type, b.name AS brand_name, b.slug AS brand_slug, c.slug AS category_slug, p.normalized_key
+         FROM products p JOIN brands b ON b.id = p.brand_id JOIN categories c ON c.id = p.category_id
+         ${facet.joins}
+        WHERE p.status = 'published' AND p.deleted_at IS NULL AND ${facet.where}
+        ORDER BY p.popularity DESC LIMIT ?`,
+      [limit],
+    );
+    for (const r of rowsF) {
+      if (out.length >= limit) break;
+      const lbl = displayName(r.brand_name, r.name);
+      if (seen.has(lbl)) continue;
+      seen.add(lbl);
+      out.push({
+        label: lbl,
+        url: `/${r.fuel_type === 'electric' ? 'electric' : 'bikes'}/${r.brand_slug}/${r.slug}`,
+        kind: facet.label,
+      });
+    }
+  }
 
   if (out.length < limit) {
     const used = await db.all<any>(

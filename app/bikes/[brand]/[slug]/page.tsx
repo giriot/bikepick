@@ -19,7 +19,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { VariantTable } from '@/components/VariantTable';
 import { ProductGallery } from '@/components/ProductGallery';
 import { SpecSuggestionForm } from '@/components/SpecSuggestionForm';
-import { featureAdvantage } from '@/lib/spec-dots';
+import { SpecsAccordion } from '@/components/SpecsAccordion';
 import { AdSlot } from '@/components/AdSlot';
 import { AffiliateLink } from '@/components/AffiliateLink';
 import { ReviewForm } from '@/components/ReviewForm';
@@ -155,13 +155,15 @@ export default async function ProductPage({ params, searchParams }: Params) {
     ? (segRange != null ? `EVs · ~${Math.round(segRange)} km range` : 'this segment')
     : (segCc != null ? `~${Math.round(segCc)} cc ${isScooter ? 'scooters' : 'bikes'}` : 'this segment');
 
-  // "EVs to check at the same running cost" — electric models (same body type
-  // where possible) whose petrol-equivalent mileage is nearest this bike's
-  // mileage, computed honestly from each EV's cost per km. Petrol pages only.
+  // "EVs at a matching running cost" — shown only for commuter bikes whose
+  // economy sits in the 50–80 kmpl band (the class where an EV comparison is
+  // meaningful). Electric models (same body type where possible) are ranked
+  // by how close their cost per km is to this bike's. Petrol pages only.
   const PETROL_PRICE = 104.5; // ₹/L — same tariff the ownership calculator uses
   const bikeKmpL = !isEv ? Number(bike?.mileage_kmpl || 0) || null : null;
+  const evBand = bikeKmpL != null && bikeKmpL >= 50 && bikeKmpL <= 80;
   let evSuggest: any[] = [];
-  if (!isEv) {
+  if (!isEv && evBand) {
     const fetchEvs = (scoped: boolean) =>
       db.all<any>(
         `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type, p.body_type,
@@ -310,6 +312,18 @@ export default async function ProductPage({ params, searchParams }: Params) {
                 {!isEv && (
                   <div className="mt-2.5">
                     <RoundEthanolBadge blend={product.ethanol_blend} />
+                  </div>
+                )}
+                {!isEv && bike?.mileage_kmpl != null && (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-line bg-white px-3 py-2 text-[12px]">
+                    <span className="font-semibold text-ink-soft">⛽ Mileage</span>
+                    <span className="font-bold text-ink">{Math.round(bike.mileage_kmpl)} {isCng ? 'km/kg (CNG)' : 'kmpl'}</span>
+                    <span className="text-[11px] text-ink-mute">company claimed</span>
+                    {bike.real_world_mileage_kmpl != null && (
+                      <span className="text-[11px] text-ink-mute">
+                        · real-world ≈ <span className="font-semibold text-emerald-700">{Math.round(bike.real_world_mileage_kmpl)} kmpl</span>
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -586,84 +600,12 @@ export default async function ProductPage({ params, searchParams }: Params) {
         {/* ------------------------------ SPECS ----------------------------- */}
         <section className="mt-12" id="specifications">
           <SectionHeader title="Full specifications" subtitle="Empty fields mean the value has not been verified — we never guess." />
-          {/* Green-dot legend */}
-          <div className="mb-2 flex items-center gap-2 text-[12px] text-ink-mute">
-            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-emerald-100" />
-            </span>
-            Green dot = a class-leading or genuinely useful feature — hover (or long-press on mobile) the dot for its advantage.
-          </div>
-          {/* Excel-style sheet: ONE table. 6 columns on wide screens (3 ×
-              label/value pairs per row, as many rows as required), 2 columns
-              (1 pair per row) on mobile. Group bands mark each section. */}
-          <div className="card overflow-hidden">
-            <div className="grid grid-cols-2 min-[900px]:grid-cols-[1.1fr_1.6fr_1.1fr_1.6fr_1.1fr_1.6fr]">
-              {(() => {
-                const groups = (isEv
-                  ? EV_GROUPS(ev, bike, product, onRoadMin)
-                  : BIKE_GROUPS(bike, product, onRoadMin)
-                ).filter((g) => g.rows.length > 0);
-                const cells: any[] = [];
-                for (const group of groups) {
-                  cells.push(
-                    <div key={`${group.title}-head`} className="col-span-2 min-[900px]:col-span-6 border-b border-line bg-surface px-4 py-1.5 text-[11.5px] font-semibold uppercase tracking-wide">
-                      {group.title}
-                    </div>,
-                  );
-                  // Grid-column tracking on desktop (band starts a new row).
-                  // `col` = column occupied by the last pushed cell (1–6).
-                  let col = 0;
-                  for (const [label, value] of group.rows) {
-                    col += 1; // label
-                    const valueCol = col + 1; // value (2, 4 or 6)
-                    const rich = value && typeof value === 'object'
-                      ? value as { text: string; badge?: string; cls?: string; note?: string }
-                      : null;
-                    const text = rich ? rich.text : (value as any);
-                    const adv = featureAdvantage(label, typeof text === 'string' ? text : String(text ?? ''));
-                    cells.push(
-                      <div key={`${group.title}-${label}-dt`} className="border-b border-line px-4 py-1.5 text-[12.5px] text-ink-mute">{label}</div>,
-                      <div key={`${group.title}-${label}-dd`} className="border-b border-r border-line px-4 py-1.5 text-[12.5px] font-medium">
-                        {rich ? (
-                          <span className="inline-flex flex-wrap items-center gap-1.5">
-                            {rich.text}
-                            {rich.badge && (
-                              <span title={rich.note} className={`cursor-help rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide ring-1 ${rich.cls || 'bg-surface text-ink-mute ring-line'}`}>
-                                {rich.badge}
-                              </span>
-                            )}
-                          </span>
-                        ) : text === 'Yes'
-                          ? <span className="font-semibold text-emerald-600">Yes</span>
-                          : text === 'No'
-                            ? <span className="font-semibold text-rose-600">No</span>
-                            : (text || '—')}
-                        {adv && (
-                          <span
-                            title={adv}
-                            className="group/dot relative ml-1.5 inline-flex h-4 w-4 cursor-help items-center justify-center align-middle"
-                          >
-                            <span className="h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-emerald-100" />
-                            <span
-                              className={`pointer-events-none absolute bottom-full z-30 mb-2 hidden w-60 rounded-lg bg-ink px-3 py-2 text-left text-[11.5px] font-normal leading-4 text-white shadow-pop group-hover/dot:block ${
-                                valueCol === 6 ? 'right-0' : 'left-1/2 -translate-x-1/2'
-                              }`}
-                            >
-                              {adv}
-                            </span>
-                          </span>
-                        )}
-                      </div>,
-                    );
-                    col = valueCol === 6 ? 0 : valueCol;
-                  }
-                  // (Pros & cons moved out of the sheet — they now sit below the
-                  //  Cost per km card in the "Why this scores" section.)
-                }
-                return cells;
-              })()}
-            </div>
-          </div>
+          <SpecsAccordion
+            groups={(isEv
+              ? EV_GROUPS(ev, bike, product, onRoadMin)
+              : BIKE_GROUPS(bike, product, onRoadMin)
+            ).filter((g) => g.rows.length > 0)}
+          />
         </section>
 
         {/* ------------------------- SCORE BREAKDOWN ------------------------
@@ -845,7 +787,9 @@ function BIKE_GROUPS(b: any, p: any, onRoadMin: number | null) {
       ['Max power', b?.max_power_bhp ? `${b.max_power_bhp} bhp${b.max_power_rpm ? ` @ ${b.max_power_rpm} rpm` : ''}` : null],
       ['Max torque', b?.max_torque_nm ? `${b.max_torque_nm} Nm${b.max_torque_rpm ? ` @ ${b.max_torque_rpm} rpm` : ''}` : null],
       ['Transmission', b?.transmission], ['Clutch', b?.clutch], ['Gearbox', b?.gearbox],
-      ['Top speed', num(b?.top_speed_kmph, 'km/h')], ['Mileage (claimed)', num(b?.mileage_kmpl, isCng ? 'km/kg (CNG)' : 'kmpl')],
+      ['Top speed', num(b?.top_speed_kmph, 'km/h')],
+      ['Mileage (company claimed)', num(b?.mileage_kmpl, isCng ? 'km/kg (CNG)' : 'kmpl')],
+      ['Mileage (real-world)', num(b?.real_world_mileage_kmpl, 'kmpl')],
       ['Fuel tank', num(b?.fuel_tank_l, 'L')],
     ] as [string, any][] },
     { title: 'Dimensions & weight', rows: [

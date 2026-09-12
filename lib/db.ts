@@ -156,6 +156,10 @@ const PG_RUNTIME_MIGRATIONS: { name: string; sql: string }[] = [
     name: 'rt_ethanol_blend',
     sql: 'ALTER TABLE products ADD COLUMN IF NOT EXISTS ethanol_blend TEXT',
   },
+  {
+    name: 'rt_real_world_mileage',
+    sql: 'ALTER TABLE bike_specs ADD COLUMN IF NOT EXISTS real_world_mileage_kmpl REAL',
+  },
 ];
 
 async function applyPgRuntimeMigrations(pool: any) {

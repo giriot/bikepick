@@ -19,7 +19,7 @@ export function SearchBox({
   const router = useRouter();
 
   useEffect(() => {
-    if (q.trim().length < 2) { setItems([]); setOpen(false); return; }
+    if (q.trim().length < 2) { setItems([]); return; }
     const t = setTimeout(async () => {
       setLoading(true);
       try {
@@ -83,29 +83,69 @@ export function SearchBox({
         <button type="submit" className={`btn-primary shrink-0 ${size === 'lg' ? '' : 'btn-sm'}`}>Search</button>
       </form>
 
-      {open && items.length > 0 && (
-        <ul id="search-suggestions" role="listbox" aria-label="Search suggestions" className="absolute z-50 mt-2 max-h-80 w-full overflow-auto rounded-2xl border border-line bg-white p-1.5 shadow-pop">
-          {items.map((s, i) => (
-            <li key={s.url + i}>
-              <button
-                type="button"
-                id={`search-suggestion-${i}`}
-                role="option"
-                aria-selected={i === active}
-                onClick={() => { router.push(s.url); setOpen(false); }}
-                className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm ${i === active ? 'bg-brand-50 text-brand-700' : 'hover:bg-surface'}`}
-              >
-                <span className="truncate font-medium">{s.label}</span>
-                <span className="shrink-0 text-[11px] uppercase tracking-wide text-ink-mute">{s.kind}</span>
+      {open && (
+        q.trim().length < 2 ? (
+          <div className="absolute z-50 mt-2 w-full rounded-2xl border border-line bg-white p-3 shadow-pop">
+            <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-ink-mute">Search by specification</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {[
+                ['E20 ready', '/ethanol'],
+                ['E85 / E100 flex', '/ethanol'],
+                ['Hybrid CNG', '/hybrid'],
+                ['Electric', '/electric'],
+                ['ABS', '/search?q=abs'],
+                ['Disc brake', '/search?q=disc'],
+                ['LED lights', '/search?q=led'],
+                ['100–125 cc', '/bikes?minCc=100&maxCc=125'],
+                ['150–200 cc', '/bikes?minCc=150&maxCc=200'],
+                ['Under ₹80k', '/bikes?maxPrice=80000'],
+              ].map(([label, url]) => (
+                <button
+                  key={url}
+                  type="button"
+                  onClick={() => { setOpen(false); router.push(url); }}
+                  className="chip !py-1 !text-xs"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2.5 px-1 text-[11px] leading-4 text-ink-mute">
+              Or type a spec — try <button type="button" onClick={() => setQ('abs')} className="font-semibold text-brand-600 hover:underline">abs</button>,{' '}
+              <button type="button" onClick={() => setQ('disc')} className="font-semibold text-brand-600 hover:underline">disc</button>,{' '}
+              <button type="button" onClick={() => setQ('led')} className="font-semibold text-brand-600 hover:underline">led</button>,{' '}
+              <button type="button" onClick={() => setQ('160cc')} className="font-semibold text-brand-600 hover:underline">160cc</button> or{' '}
+              <button type="button" onClick={() => setQ('e100')} className="font-semibold text-brand-600 hover:underline">e100</button>.
+            </p>
+          </div>
+        ) : items.length > 0 ? (
+          <ul id="search-suggestions" role="listbox" aria-label="Search suggestions" className="absolute z-50 mt-2 max-h-80 w-full overflow-auto rounded-2xl border border-line bg-white p-1.5 shadow-pop">
+            {items.map((s, i) => (
+              <li key={s.url + i}>
+                <button
+                  type="button"
+                  id={`search-suggestion-${i}`}
+                  role="option"
+                  aria-selected={i === active}
+                  onClick={() => { router.push(s.url); setOpen(false); }}
+                  className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm ${i === active ? 'bg-brand-50 text-brand-700' : 'hover:bg-surface'}`}
+                >
+                  <span className="truncate font-medium">{s.label}</span>
+                  <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-mute ring-1 ring-line">{s.kind}</span>
+                </button>
+              </li>
+            ))}
+            <li>
+              <button type="button" onClick={() => submit()} className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-brand-600 hover:bg-brand-50">
+                See all results for “{q}”
               </button>
             </li>
-          ))}
-          <li>
-            <button type="button" onClick={() => submit()} className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-brand-600 hover:bg-brand-50">
-              See all results for “{q}”
-            </button>
-          </li>
-        </ul>
+          </ul>
+        ) : (
+          <div className="absolute z-50 mt-2 w-full rounded-2xl border border-line bg-white p-3 text-[13px] text-ink-mute shadow-pop">
+            No suggestions — press <span className="font-semibold text-ink">Search</span> to see all matches.
+          </div>
+        )
       )}
     </div>
   );
