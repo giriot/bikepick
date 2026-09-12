@@ -95,9 +95,6 @@ export default async function ProductPage({ params, searchParams }: Params) {
   const monthlyKm = 800; // typical Indian two-wheeler monthly usage, used only for the "est. monthly" figure
   const lost5 = resale5 && product.price_min ? product.price_min - resale5.value : null;
   const lostPerYear = lost5 != null ? Math.round(lost5 / 5) : null;
-  const RING_R = 34;
-  const RING_C = 2 * Math.PI * RING_R;
-  const ringOffset = retention5 != null ? RING_C * (1 - retention5 / 100) : RING_C;
 
   const [similar, usedOfModel, accessories] = await Promise.all([
     listProducts({ category: base, minPrice: (product.price_min || 0) * 0.7, maxPrice: (product.price_min || 0) * 1.35, perPage: 5 }),
@@ -323,89 +320,48 @@ export default async function ProductPage({ params, searchParams }: Params) {
                 </div>
 
                 <div className="p-4">
-                  {/* Bikepick Score — computed from specs & price only */}
-                  <div className="flex items-center gap-3.5">
-                    <ScoreRing score={scored.total} size={70} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-semibold text-ink-soft">Bikepick Score</p>
-                      <p className="text-[11px] leading-4 text-ink-mute">
-                        Weighted pillars from specifications &amp; price — never paid placement.{' '}
-                        <Link href="#score" className="font-semibold text-brand-600 hover:underline">Why this score?</Link>
-                      </p>
-                    </div>
+                  {/* Value after 5 years — one clean headline number */}
+                  <p className="text-[11px] font-medium text-ink-mute">Estimated value after 5 years</p>
+                  <div className="mt-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                    <span className="text-[28px] font-extrabold leading-none tracking-tight text-brand-600">
+                      {resale5 ? inr(resale5.value) : '—'}
+                    </span>
+                    {retention5 != null && (
+                      <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold text-accent-dark ring-1 ring-accent/30">
+                        keeps ~{retention5}%
+                      </span>
+                    )}
                   </div>
-
-                  <div className="my-3 border-t border-line" />
-
-                  {/* Ring gauge + headline numbers */}
-                  <div className="flex items-center gap-4">
-                    <svg width="86" height="86" viewBox="0 0 86 86" className="shrink-0" role="img" aria-label={`${retention5}% of price retained after 5 years`}>
-                      <circle cx="43" cy="43" r={RING_R} fill="none" stroke="#F6F8FB" strokeWidth="11" />
-                      <circle
-                        cx="43" cy="43" r={RING_R} fill="none" stroke="#F0620C" strokeWidth="11" strokeLinecap="round"
-                        strokeDasharray={RING_C} strokeDashoffset={ringOffset} transform="rotate(-90 43 43)"
-                      />
-                      <text x="43" y="41" textAnchor="middle" fontSize="16" fontWeight="800" fill="#0B1220">{retention5}%</text>
-                      <text x="43" y="55" textAnchor="middle" fontSize="8" fill="#6B7686">value kept</text>
-                    </svg>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] text-ink-mute">Estimated value after 5 years</p>
-                      <p className="text-[24px] font-extrabold leading-tight tracking-tight text-brand-600">{resale5 ? inr(resale5.value) : '—'}</p>
-                      <p className="text-[11px] text-ink-mute">
-                        vs <span className="font-semibold text-ink">{inr(product.price_min)}</span> ex-showroom today
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Smart read — one-line takeaway */}
-                  {retention5 != null && lostPerYear != null && (
-                    <div className="mt-3.5 rounded-lg bg-brand-50 px-3 py-2 text-[12px] leading-5 text-brand-800">
-                      <span className="font-bold">Smart read:</span> this {isEv ? 'scooter' : 'bike'} keeps about{' '}
-                      <span className="font-bold">{retention5}%</span> of its price in 5 years — depreciation of roughly{' '}
-                      <span className="font-bold">{inr(lostPerYear)}/yr</span>.
-                    </div>
+                  {lostPerYear != null && (
+                    <p className="mt-1.5 text-[11px] leading-4 text-ink-mute">
+                      vs <span className="font-semibold text-ink">{inr(product.price_min)}</span> ex-showroom today · loses about{' '}
+                      <span className="font-semibold text-ink">{inr(lostPerYear)}/yr</span> to depreciation
+                    </p>
                   )}
 
-                  {/* Year-by-year depreciation */}
-                  <div className="mt-3.5 space-y-1.5">
-                    {resaleCurve?.map((p) => (
-                      <div key={p.year} className="flex items-center gap-2">
-                        <span className="w-6 shrink-0 text-[10px] font-medium text-ink-mute">Y{p.year}</span>
-                        <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-surface">
-                          <div
-                            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-brand-400 to-brand-500"
-                            style={{ width: `${p.retainedPct}%` }}
-                          />
-                          <div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-brand-200 to-brand-300" style={{ width: `${p.retainedPct}%`, opacity: 0.25 }} />
-                        </div>
-                        <span className="w-14 shrink-0 text-right text-[10px] font-semibold tabular-nums">{inr(p.value, { compact: true })}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <div className="my-3.5 border-t border-line" />
 
-                  {/* Running cost — prominent per-km figure */}
-                  <div className="mt-3.5 rounded-lg border border-brand-100 bg-brand-50/70 px-3 py-2.5">
-                    <div className="flex items-end justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] text-ink-mute">{isEv ? '⚡ Running cost (electricity)' : '⛽ Running cost (fuel)'}</p>
-                        <p className="text-[20px] font-extrabold leading-none tracking-tight">
-                          {costPerKm ? `₹${costPerKm.toFixed(2)}` : '—'}
-                          <span className="text-[11px] font-medium text-ink-mute">/km</span>
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] text-ink-mute">≈ per month</p>
-                        <p className="text-[14.5px] font-bold">{costPerKm ? inr(Math.round(costPerKm * monthlyKm)) : '—'}</p>
-                      </div>
+                  {/* Running cost */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-surface px-3 py-2.5">
+                      <p className="text-[10px] text-ink-mute">{isEv ? '⚡ Running cost' : '⛽ Running cost'}</p>
+                      <p className="mt-0.5 text-[16px] font-bold leading-none">
+                        {costPerKm ? `₹${costPerKm.toFixed(2)}` : '—'}
+                        <span className="text-[11px] font-medium text-ink-mute">/km</span>
+                      </p>
                     </div>
-                    <p className="mt-1.5 text-[9.5px] leading-4 text-ink-mute">
-                      Based on {monthlyKm} km/month typical usage — energy cost only, maintenance excluded.
-                    </p>
+                    <div className="rounded-lg bg-surface px-3 py-2.5">
+                      <p className="text-[10px] text-ink-mute">≈ per month</p>
+                      <p className="mt-0.5 text-[16px] font-bold leading-none">{costPerKm ? inr(Math.round(costPerKm * monthlyKm)) : '—'}</p>
+                    </div>
                   </div>
+                  <p className="mt-1.5 text-[9.5px] leading-4 text-ink-mute">
+                    {monthlyKm} km/month typical usage — energy cost only, maintenance excluded.
+                  </p>
 
                   {/* Cheaper in this segment — price-conscious hint */}
                   {cheaper.length > 0 ? (
-                    <div className="mt-2.5 rounded-lg border border-accent/25 bg-accent-soft/60 px-3 py-2.5">
+                    <div className="mt-3 rounded-lg border border-accent/25 bg-accent-soft/60 px-3 py-2.5">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-accent-dark">💡 Cheaper in this segment</p>
                       <ul className="mt-1.5 space-y-1.5">
                         {cheaper.map((s) => (
@@ -427,7 +383,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
                       </ul>
                     </div>
                   ) : segmentHasOthers ? (
-                    <div className="mt-2.5 rounded-lg border border-accent/25 bg-accent-soft/60 px-3 py-2.5 text-[12px] leading-5 text-accent-dark">
+                    <div className="mt-3 rounded-lg border border-accent/25 bg-accent-soft/60 px-3 py-2.5 text-[12px] leading-5 text-accent-dark">
                       <span className="font-bold">Most affordable in this segment</span> — no similar model is listed cheaper right now.
                     </div>
                   ) : null}
