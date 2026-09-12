@@ -124,7 +124,27 @@ export function organizationJsonLd() {
     name: SITE_NAME,
     url: siteUrl(),
     slogan: SITE_TAGLINE,
+    logo: absolute('/icon.png'),
     description: 'Indian two-wheeler comparison, verified used-bike marketplace and dealer offer platform.',
+  };
+}
+
+/** WebSite + SearchAction — lets Google surface a site search box in results. */
+export function websiteJsonLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: SITE_NAME,
+    url: siteUrl(),
+    inLanguage: 'en-IN',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${siteUrl()}/search?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
   };
 }
 

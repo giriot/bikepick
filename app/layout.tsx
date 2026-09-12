@@ -5,7 +5,7 @@ import { Footer } from '@/components/Footer';
 import { CompareTray } from '@/components/CompareTray';
 import { RetryBudgetReset } from '@/components/RetryBudgetReset';
 import { getCurrentUser } from '@/lib/auth';
-import { JsonLd, organizationJsonLd, siteUrl } from '@/lib/seo';
+import { JsonLd, organizationJsonLd, siteUrl, websiteJsonLd } from '@/lib/seo';
 import { ADSENSE_JS_SRC } from '@/lib/ads';
 
 export const metadata: Metadata = {
@@ -51,6 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="flex min-h-screen flex-col">
         <script async src={ADSENSE_JS_SRC} crossOrigin="anonymous" />
         <JsonLd data={organizationJsonLd()} />
+        <JsonLd data={websiteJsonLd()} />
         <Header user={user} />
         <main id="main" className="flex-1">{children}</main>
         <Footer />

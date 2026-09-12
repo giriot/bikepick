@@ -268,14 +268,6 @@ export default async function HomePage() {
               </div>
             ))}
           </div>
-          <div className="mt-8 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/[.04] p-5">
-            <p className="flex-1 text-[13px] leading-6 text-white/70">
-              <strong className="font-semibold text-white">Demo dataset notice.</strong> This installation is seeded with
-              clearly-labelled demo products for testing. Prices are illustrative, not live market prices. Replace them
-              with authorised feeds or a CSV import from the admin panel before launch.
-            </p>
-            <Link href="/admin" className="btn bg-white text-ink hover:bg-white/90 btn-sm">Open admin panel</Link>
-          </div>
         </div>
       </section>
 
