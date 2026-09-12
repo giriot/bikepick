@@ -155,23 +155,21 @@ export default async function ProductPage({ params, searchParams }: Params) {
     ? (segRange != null ? `EVs · ~${Math.round(segRange)} km range` : 'this segment')
     : (segCc != null ? `~${Math.round(segCc)} cc ${isScooter ? 'scooters' : 'bikes'}` : 'this segment');
 
-  // EVs to consider as a cross-fuel alternative, chosen two different ways:
+  // EVs to consider as a cross-fuel alternative, matched by ex-showroom price:
   //
-  //   • Performance bikes (200 cc+) — the buyer weighs comfort & riding style,
-  //     so we pick EV motorcycles (or the sportiest EVs) whose top speed and
-  //     power are nearest this bike's. Cost/km is shown, but style leads.
-  //   • Commuters & scooters in the 50–80 kmpl band — we pick EV scooters at
-  //     the nearest running cost (the petrol-equivalent "same kilometre").
+  //   • Performance bikes (200 cc+) — EV motorcycles nearest this bike's
+  //     ex-showroom price (the buyer is shopping a budget, not a fuel type).
+  //   • Commuters & scooters in the 50–80 kmpl band — EV scooters nearest
+  //     this bike's ex-showroom price.
   // Petrol pages only.
-  const PETROL_PRICE = 104.5; // ₹/L — same tariff the ownership calculator uses
   const bikeKmpL = !isEv ? Number(bike?.mileage_kmpl || 0) || null : null;
   const bikeCc = !isEv ? Number(bike?.engine_capacity_cc || 0) || null : null;
-  const bikeSpeed = !isEv ? Number(bike?.top_speed_kmph || 0) || null : null;
+  const bikePrice = !isEv ? (Number(product.price_min) > 0 ? Number(product.price_min) : null) : null;
   const isPerformance = bikeCc != null && bikeCc > 200;
   const evBand = bikeKmpL != null && bikeKmpL >= 50 && bikeKmpL <= 80;
   let evSuggest: any[] = [];
-  let evMode: 'cost' | 'style' = 'cost';
-  if (!isEv && (isPerformance || evBand)) {
+  let evMode: 'bike' | 'scooter' = 'scooter';
+  if (!isEv && bikePrice != null && (isPerformance || evBand)) {
     const evs = await db.all<any>(
       `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type, p.body_type,
               b.name AS brand_name, b.slug AS brand_slug,
@@ -194,31 +192,26 @@ export default async function ProductPage({ params, searchParams }: Params) {
       if (range > 0 && kwh > 0) return (kwh / range) * (8 / 0.85);
       return null;
     };
-    const evSpeed = (r: any) => Number(r.top_speed_kmph) || 0;
-    const evPower = (r: any) => Number(r.peak_power_kw) || Number(r.motor_power_kw) || 0;
+
+    // Price match: closest ex-showroom price wins (ties broken by lower price).
+    const priced = evs
+      .filter((r: any) => Number(r.price_min) > 0)
+      .map((r: any) => ({ ...r, price: Number(r.price_min), cost_km: evCostKm(r) }));
+    const byPrice = (a: any, b: any) =>
+      Math.abs(a.price - (bikePrice as number)) - Math.abs(b.price - (bikePrice as number));
 
     if (isPerformance) {
-      // Riding-style match: prefer EV motorcycles, fall back to the sportiest EVs.
-      const cycles = evs.filter((r) => r.body_type !== 'scooter');
-      const pool = cycles.length ? cycles : evs;
-      evSuggest = pool
-        .map((r) => ({ ...r, cost_km: evCostKm(r), speed: evSpeed(r), power: evPower(r) }))
-        .sort((a, b) => Math.abs((a.speed || 0) - (bikeSpeed || 0)) - Math.abs((b.speed || 0) - (bikeSpeed || 0)))
-        .slice(0, 2);
-      evMode = 'style';
+      // EV motorcycles nearest in price; fall back to any EV if none listed.
+      const cycles = priced.filter((r) => r.body_type !== 'scooter');
+      const pool = cycles.length ? cycles : priced;
+      evSuggest = [...pool].sort(byPrice).slice(0, 2);
+      evMode = 'bike';
     } else {
-      // Same-kilometre match: EV scooters nearest this bike's economy.
-      const scooters = evs.filter((r) => r.body_type === 'scooter');
-      const pool = scooters.length ? scooters : evs;
-      evSuggest = pool
-        .map((r) => {
-          const c = evCostKm(r);
-          return { ...r, cost_km: c, eq_kmpl: c ? PETROL_PRICE / c : null, speed: evSpeed(r), power: evPower(r) };
-        })
-        .filter((r) => r.eq_kmpl != null)
-        .sort((a, b) => Math.abs((a.eq_kmpl ?? 0) - (bikeKmpL ?? 0)) - Math.abs((b.eq_kmpl ?? 0) - (bikeKmpL ?? 0)))
-        .slice(0, 2);
-      evMode = 'cost';
+      // EV scooters nearest in price; fall back to any EV if none listed.
+      const scooters = priced.filter((r) => r.body_type === 'scooter');
+      const pool = scooters.length ? scooters : priced;
+      evSuggest = [...pool].sort(byPrice).slice(0, 2);
+      evMode = 'scooter';
     }
   }
 
@@ -498,48 +491,45 @@ export default async function ProductPage({ params, searchParams }: Params) {
                     </div>
                   ) : null}
 
-                  {/* EVs to consider (cross-fuel suggestion) — same-kilometre for
-                      commuters, riding-style match for performance bikes. */}
+                  {/* EVs to consider (cross-fuel suggestion) — matched by ex-showroom price. */}
                   {evSuggest.length > 0 && (
                     <div className="mt-2.5 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2.5">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-brand-700">
-                        ⚡ {evMode === 'style'
-                          ? `EVs for a similar riding style (${Math.round(bikeCc ?? 0)} cc)`
-                          : `EV scooters at matching running cost`}
+                        ⚡ {evMode === 'bike'
+                          ? 'EV motorcycles at a similar ex-showroom price'
+                          : 'EV scooters at a similar ex-showroom price'}
                       </p>
                       <ul className="mt-1.5 space-y-1.5">
-                        {evSuggest.map((s) => (
-                          <li key={s.id} className="flex items-center justify-between gap-2 text-[12px]">
-                            <Link
-                              href={`/electric/${s.brand_slug}/${s.slug}`}
-                              className="min-w-0 truncate font-medium hover:text-brand-600 hover:underline"
-                            >
-                              {s.brand_name} {s.name}
-                            </Link>
-                            <span className="shrink-0 text-right">
-                              <span className="font-bold text-brand-700">{inr(s.price_min)}</span>
-                              {evMode === 'style' ? (
+                        {evSuggest.map((s) => {
+                          const diff = bikePrice != null && s.price != null ? s.price - bikePrice : null;
+                          return (
+                            <li key={s.id} className="flex items-center justify-between gap-2 text-[12px]">
+                              <Link
+                                href={`/electric/${s.brand_slug}/${s.slug}`}
+                                className="min-w-0 truncate font-medium hover:text-brand-600 hover:underline"
+                              >
+                                {s.brand_name} {s.name}
+                              </Link>
+                              <span className="shrink-0 text-right leading-tight">
+                                <span className="font-bold text-brand-700">{inr(s.price)}</span>
                                 <span className="ml-1 block text-[10px] text-ink-mute">
-                                  {s.speed ? `${s.speed} km/h` : ''}{s.power ? ` · ${s.power} kW` : ''}
-                                  {s.cost_km != null ? ` · ≈₹${s.cost_km.toFixed(2)}/km` : ''}
+                                  {diff != null && diff !== 0 && (
+                                    <span className={diff > 0 ? 'text-rose-600' : 'text-green-700'}>
+                                      {diff > 0 ? `${inr(diff)} more` : `${inr(-diff)} less`}{' '}
+                                    </span>
+                                  )}
+                                  {diff === 0 && <span className="text-ink-mute">≈ same price · </span>}
+                                  {s.cost_km != null ? `≈₹${s.cost_km.toFixed(2)}/km` : ''}
                                 </span>
-                              ) : (
-                                s.cost_km != null && (
-                                  <span className="ml-1 block text-[10px] text-ink-mute">
-                                    ≈₹{s.cost_km.toFixed(2)}/km{s.eq_kmpl != null ? ` · eq. ~${Math.round(s.eq_kmpl)} kmpl` : ''}
-                                  </span>
-                                )
-                              )}
-                            </span>
-                          </li>
-                        ))}
+                              </span>
+                            </li>
+                          );
+                        })}
                       </ul>
                       <p className="mt-1.5 text-[10px] leading-4 text-ink-mute">
-                        {evMode === 'style'
-                          ? `A ${Math.round(bikeCc ?? 0)} cc rider usually weighs comfort and riding style — we picked EVs nearest this bike's performance, with honest running costs.`
-                          : bikeKmpL != null
-                            ? `This ${isScooter ? 'scooter' : 'bike'} runs at ≈₹${(PETROL_PRICE / bikeKmpL).toFixed(2)}/km (${Math.round(bikeKmpL)} kmpl). EVs on our site cost ₹0.25–0.5/km — the petrol-equivalent of roughly 200–400 kmpl.`
-                            : 'EVs on our site cost ₹0.25–0.5/km — the petrol-equivalent of roughly 200–400 kmpl.'}
+                        {evMode === 'bike'
+                          ? `This ${Math.round(bikeCc ?? 0)} cc bike is ${inr(bikePrice ?? 0)} ex-showroom — the EVs above are its closest price match, with honest ≈₹/km running costs.`
+                          : `This ${isScooter ? 'scooter' : 'bike'} is ${inr(bikePrice ?? 0)} ex-showroom — the EVs above are its closest price match, with honest ≈₹/km running costs.`}
                       </p>
                     </div>
                   )}
