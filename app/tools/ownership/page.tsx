@@ -9,17 +9,18 @@ import { buildMetadata, breadcrumbJsonLd, faqJsonLd, JsonLd } from '@/lib/seo';
 export const dynamic = 'force-dynamic';
 export const metadata = buildMetadata({
   title: '5-Year Ownership Cost Calculator — True Cost of a Bike or Scooter',
-  description: 'See the true 5-year cost of any bike or scooter: on-road price, fuel or electricity, insurance, service and resale value. Compare petrol vs electric side by side.',
+  description: 'See the true 5-year cost of any bike or scooter: on-road price, petrol, CNG or electricity, insurance, service and resale value. Compare models side by side.',
   path: '/tools/ownership',
-  keywords: ['bike ownership cost', '5 year cost of ownership bike india', 'scooter running cost 5 years', 'petrol vs electric 5 year cost'],
+  keywords: ['bike ownership cost', '5 year cost of ownership bike india', 'scooter running cost 5 years', 'petrol vs electric 5 year cost', 'cng bike running cost'],
 });
 
 const FAQ = [
-  { question: 'What does the 5-year total include?', answer: 'On-road price (ex-showroom + ~9% RTO + first-year insurance), energy (fuel or electricity) for the kilometres you ride, insurance renewals from year two, and scheduled service. It then subtracts an estimated resale value to give the net cost of ownership.' },
+  { question: 'What does the 5-year total include?', answer: 'On-road price (ex-showroom + ~9% RTO + first-year insurance), energy (petrol, CNG or electricity) for the kilometres you ride, insurance renewals from year two, and scheduled service. It then subtracts an estimated resale value to give the net cost of ownership. You can switch insurance off with the "Include insurance" tick box.' },
   { question: 'How is the on-road price estimated?', answer: 'We take the ex-showroom price in our database and add approximately 9% for road tax (RTO) and about 5% for first-year comprehensive insurance, with sensible minimum and maximum bounds. Actual on-road prices vary by state and insurer — always confirm with a dealer.' },
   { question: 'How is resale value estimated?', answer: 'We apply a standard two-wheeler depreciation curve — roughly 18% in year one, then about 10% a year tapering to 8% and 6%. It is indicative only; real resale depends on condition, kilometres, demand and paperwork.' },
-  { question: 'Why is year-one insurance shown as included?', answer: 'First-year insurance is part of the on-road price. From year two, we assume you renew at about 45% of the first-year premium, because the own-damage component reduces as the vehicle ages.' },
+  { question: 'Why is year-one insurance shown as included?', answer: 'First-year insurance is part of the on-road price. From year two, we assume you renew at about 45% of the first-year premium, because the own-damage component reduces as the vehicle ages. Untick "Include insurance" to exclude it from the estimate entirely.' },
   { question: 'What if a model is missing data?', answer: 'We never invent figures. If mileage, battery/range or price is not recorded, that line is shown as missing and the affected totals are excluded — you can still see everything we could calculate.' },
+  { question: 'Is there a CNG option?', answer: 'Yes — choose "Custom vehicle" in either picker and set the fuel to CNG. Enter the ex-showroom price and the mileage in km per kg and the calculator treats energy as CNG, priced per kg. When a CNG model is added to the catalogue it will appear in the list automatically.' },
 ];
 
 export default async function OwnershipPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
@@ -56,9 +57,9 @@ export default async function OwnershipPage({ searchParams }: { searchParams: Re
       <header className="mt-4 max-w-2xl">
         <h1 className="text-2xl font-bold tracking-[-0.03em] sm:text-[32px]">5-year ownership cost: the real price of a bike</h1>
         <p className="mt-1.5 text-sm leading-6 text-ink-mute">
-          Sticker price is only the start. Pick any petrol bike, scooter or electric vehicle and see the full 5-year cost —
-          on-road price, energy, insurance, service and resale value — or compare two models side by side. Everything runs on
-          the specs in our database, and where a figure is missing we say so instead of guessing.
+          Sticker price is only the start. Pick any petrol bike, scooter or electric vehicle — or enter a custom CNG vehicle —
+          and see the full 5-year cost: on-road price, energy, insurance, service and resale value, or compare two models side
+          by side. Everything runs on the specs in our database, and where a figure is missing we say so instead of guessing.
         </p>
       </header>
 

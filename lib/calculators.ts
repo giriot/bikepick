@@ -206,15 +206,18 @@ export function projectResale(price: number, years = 5): ResalePoint[] {
  */
 export interface OwnershipInput {
   price: number | null;                 // ex-showroom price (₹)
-  fuel: 'petrol' | 'electric';
-  mileageKmpl?: number | null;          // petrol only
+  fuel: 'petrol' | 'electric' | 'cng';
+  mileageKmpl?: number | null;          // petrol only (km per litre)
+  cngMileage?: number | null;           // cng only (km per kg)
   batteryKwh?: number | null;           // electric only
   rangeKm?: number | null;              // electric only
   years?: number;                       // ownership period, default 5
   kmPerYear?: number;                   // default 10,000
   petrolPrice?: number;                 // ₹/litre
   electricityPrice?: number;            // ₹/unit (kWh)
+  cngPrice?: number;                    // ₹/kg
   chargingEfficiencyPercent?: number;   // default 85
+  includeInsurance?: boolean;           // default true — set false to ignore insurance
 }
 
 export interface OwnershipYear {
@@ -230,6 +233,7 @@ export interface OwnershipResult {
   onRoadPrice: number | null;           // ex-showroom + RTO + first-year insurance
   energyPerKm: number | null;           // ₹/km energy only
   energyPerYear: number;
+  energyName: string;                   // 'Petrol' | 'Electricity' | 'CNG'
   insuranceRenewal: number;             // per year after year 1
   servicePerYear: number;
   years: OwnershipYear[];
@@ -259,33 +263,46 @@ export function ownershipCost(i: OwnershipInput): OwnershipResult {
   const kmPerYear = Math.max(500, i.kmPerYear ?? 10000);
   const petrolPrice = i.petrolPrice ?? 104.5;
   const electricityPrice = i.electricityPrice ?? 8;
+  const cngPrice = i.cngPrice ?? 90;
   const eff = Math.max(0.4, Math.min(1, (i.chargingEfficiencyPercent ?? 85) / 100));
+  const includeInsurance = i.includeInsurance !== false;
 
   const missing: string[] = [];
   let energyPerKm: number | null = null;
+  let energyName = 'Petrol';
 
   if (i.fuel === 'petrol') {
+    energyName = 'Petrol';
     if (!i.mileageKmpl) missing.push('recorded mileage (kmpl) — fuel cost cannot be calculated');
     else energyPerKm = petrolPrice / i.mileageKmpl;
-  } else {
+  } else if (i.fuel === 'electric') {
+    energyName = 'Electricity';
     if (!i.batteryKwh || !i.rangeKm) missing.push('battery capacity and range — electricity cost cannot be calculated');
     else energyPerKm = ((i.batteryKwh / i.rangeKm) * electricityPrice) / eff;
+  } else {
+    energyName = 'CNG';
+    if (!i.cngMileage) missing.push('recorded CNG mileage (km/kg) — fuel cost cannot be calculated');
+    else energyPerKm = cngPrice / i.cngMileage;
   }
 
   const energyPerYear = energyPerKm ? Math.round(energyPerKm * kmPerYear) : 0;
 
   let onRoadPrice: number | null = null;
   if (i.price != null && i.price > 0) {
-    const insurance = Math.max(INSURANCE_MIN, Math.min(INSURANCE_MAX, i.price * INSURANCE_RATE));
+    const insurance = includeInsurance
+      ? Math.max(INSURANCE_MIN, Math.min(INSURANCE_MAX, i.price * INSURANCE_RATE))
+      : 0;
     onRoadPrice = Math.round(i.price + i.price * RTO_RATE + insurance);
   } else {
     missing.push('ex-showroom price — purchase cost cannot be calculated');
   }
 
-  const insuranceFirstYear = i.price != null && i.price > 0
+  const insuranceFirstYear = includeInsurance && i.price != null && i.price > 0
     ? Math.max(INSURANCE_MIN, Math.min(INSURANCE_MAX, i.price * INSURANCE_RATE))
     : 0;
-  const insuranceRenewal = Math.max(RENEWAL_MIN, Math.round(insuranceFirstYear * RENEWAL_RATE));
+  const insuranceRenewal = includeInsurance
+    ? Math.max(RENEWAL_MIN, Math.round(insuranceFirstYear * RENEWAL_RATE))
+    : 0;
   const servicePerYear = i.fuel === 'electric' ? EV_SERVICE : PETROL_SERVICE;
 
   const yrs: OwnershipYear[] = [];
@@ -311,19 +328,25 @@ export function ownershipCost(i: OwnershipInput): OwnershipResult {
 
   const totalKm = kmPerYear * years;
   const assumptions: string[] = [
-    `On-road price = ex-showroom + ~${Math.round(RTO_RATE * 100)}% RTO + first-year insurance (~${Math.round(INSURANCE_RATE * 100)}% of ex-showroom).`,
-    `Insurance renewals assumed at ~${Math.round(RENEWAL_RATE * 100)}% of the first-year premium (own-damage cover reduces over time).`,
+    includeInsurance
+      ? `On-road price = ex-showroom + ~${Math.round(RTO_RATE * 100)}% RTO + first-year insurance (~${Math.round(INSURANCE_RATE * 100)}% of ex-showroom).`
+      : `On-road price = ex-showroom + ~${Math.round(RTO_RATE * 100)}% RTO (insurance excluded as requested).`,
+    includeInsurance
+      ? `Insurance renewals assumed at ~${Math.round(RENEWAL_RATE * 100)}% of the first-year premium (own-damage cover reduces over time).`
+      : 'Insurance excluded — add your own quote if you want it included.',
     `Scheduled service assumed at ₹${servicePerYear.toLocaleString('en-IN')}/year${i.fuel === 'electric' ? ' (EVs need less maintenance)' : ''}.`,
     `Depreciation uses a standard two-wheeler curve; resale value is indicative only.`,
     'All figures are estimates — real costs vary with state taxes, insurer, riding style and service pricing.',
   ];
-  if (i.fuel === 'petrol') assumptions.unshift(`Fuel at ₹${petrolPrice}/litre with the recorded ${i.mileageKmpl ?? '—'} kmpl.`);
-  else assumptions.unshift(`Electricity at ₹${electricityPrice}/unit with ${Math.round(eff * 100)}% charging efficiency over ${i.rangeKm ?? '—'} km range.`);
+  if (i.fuel === 'petrol') assumptions.unshift(`Petrol at ₹${petrolPrice}/litre with the recorded ${i.mileageKmpl ?? '—'} kmpl.`);
+  else if (i.fuel === 'electric') assumptions.unshift(`Electricity at ₹${electricityPrice}/unit with ${Math.round(eff * 100)}% charging efficiency over ${i.rangeKm ?? '—'} km range.`);
+  else assumptions.unshift(`CNG at ₹${cngPrice}/kg with the recorded ${i.cngMileage ?? '—'} km/kg.`);
 
   return {
     onRoadPrice,
     energyPerKm: energyPerKm == null ? null : round2(energyPerKm),
     energyPerYear,
+    energyName,
     insuranceRenewal,
     servicePerYear,
     years: yrs,
