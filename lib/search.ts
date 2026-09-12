@@ -49,9 +49,9 @@ function detectSpecFacet(q: string): SpecFacet | null {
   if (/\be85\b/.test(s)) return { label: 'E85/E100 flex-fuel', joins: '', where: "p.ethanol_blend IN ('e85','e100')" };
   if (/\b(e20|ethanol)\b/.test(s)) return { label: 'E20 ready', joins: '', where: "p.ethanol_blend = 'e20'" };
   if (/\babs\b/.test(s)) return { label: 'ABS', joins: BS, where: "bs.abs_type IS NOT NULL AND bs.abs_type <> ''" };
-  if (/\bdisc\b/.test(s)) return { label: 'Disc brake', joins: BS, where: "(bs.front_brake LIKE '%disc%' OR bs.rear_brake LIKE '%disc%')" };
-  if (/\bdrum\b/.test(s)) return { label: 'Drum brake', joins: BS, where: "(bs.front_brake LIKE '%drum%' OR bs.rear_brake LIKE '%drum%')" };
-  if (/\bled\b/.test(s)) return { label: 'LED lights', joins: BS, where: "(bs.headlight LIKE '%led%' OR bs.tail_light LIKE '%led%')" };
+  if (/\bdisc\b/.test(s)) return { label: 'Disc brake', joins: BS, where: "(LOWER(bs.front_brake) LIKE '%disc%' OR LOWER(bs.rear_brake) LIKE '%disc%')" };
+  if (/\bdrum\b/.test(s)) return { label: 'Drum brake', joins: BS, where: "(LOWER(bs.front_brake) LIKE '%drum%' OR LOWER(bs.rear_brake) LIKE '%drum%')" };
+  if (/\bled\b/.test(s)) return { label: 'LED lights', joins: BS, where: "(LOWER(bs.headlight) LIKE '%led%' OR LOWER(bs.tail_light) LIKE '%led%')" };
   if (/\b(cng|hybrid)\b/.test(s)) return { label: 'CNG / Hybrid', joins: '', where: "p.fuel_type IN ('cng','hybrid','cng_petrol')" };
   if (/\b(electric|ev)\b/.test(s)) return { label: 'Electric', joins: '', where: "p.fuel_type = 'electric'" };
   const cc = s.match(/(\d{2,4})\s*cc\b/);
