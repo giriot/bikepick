@@ -1,6 +1,7 @@
 import 'server-only';
 import { db, insert, nowIso, uid } from './db';
 import { slugify, normalizeKey } from './slug';
+import { cleanModelName } from './format';
 import { getImportType, type ImportType } from './import-schema';
 import type { AppUser } from '@/types';
 
@@ -73,6 +74,12 @@ export async function planImport(typeKey: string, rows: Record<string, string>[]
     seen.add(dedupeKey);
 
     if (errors.length) { plans.push({ index: i, action: 'error', label, changes: [], errors, data }); continue; }
+
+    // Products: strip a leading brand from model name before match/write so
+    // "Hero Xtreme 125R" and "Xtreme 125R" hit the same normalized_key.
+    if (type.key === 'products' && data.brand && data.name) {
+      data.name = cleanModelName(String(data.brand), String(data.name));
+    }
 
     const existing = await findExisting(type, data);
     if (!existing) {
@@ -215,6 +222,9 @@ async function applyProduct(row: RowPlan, user: AppUser) {
   const brandId = await brandIdFor(String(d.brand));
   const isEv = d.fuel_type === 'electric';
   let productId = row.existingId;
+  // Always store model-only name ("Xtreme 125R", not "Hero Xtreme 125R") so
+  // brand.label + name never doubles on the public site.
+  const modelName = cleanModelName(String(d.brand || ''), String(d.name || ''));
 
   // Resolve the real category from fuel + body type. The live categories are
   // motorcycle / scooter / electric-scooter / electric-motorcycle — a null
@@ -234,14 +244,15 @@ async function applyProduct(row: RowPlan, user: AppUser) {
       `UPDATE products SET brand_id = ?, category_id = ?, name = ?, fuel_type = ?, body_type = ?,
         model_year = ?, price_min = ?, price_max = ?, status = ?, verification_status = ?,
         deleted_at = NULL, updated_at = ? WHERE id = ?`,
-      [brandId, category?.id || null, d.name, d.fuel_type, d.body_type,
+      [brandId, category?.id || null, modelName, d.fuel_type, d.body_type,
        d.model_year, d.price_min, d.price_max, d.status || 'draft', 'admin_verified',
        nowIso(), productId],
     );
   } else if (!productId) {
+    // Slug is model-only (brand already lives in the URL path /bikes/{brand}/{slug}).
     productId = await insert('products', {
       id: uid('prd'), brand_id: brandId, category_id: category?.id || null,
-      name: d.name, slug: slugify(`${d.brand}-${d.name}`), normalized_key: normalizeKey(d.brand, d.name),
+      name: modelName, slug: slugify(modelName), normalized_key: normalizeKey(d.brand, modelName),
       fuel_type: d.fuel_type, body_type: d.body_type, model_year: d.model_year,
       price_min: d.price_min, price_max: d.price_max,
       status: d.status || 'draft', verification_status: 'admin_verified', is_demo: 0,

@@ -67,6 +67,50 @@ export function titleCase(s: string): string {
   return s.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/**
+ * Join brand + model without repeating the brand.
+ * Some rows store the brand inside `products.name` ("Honda Activa E",
+ * "TVS Raider 125", "Royal Enfield Hunter 350"), so a naive
+ * `${brand} ${name}` becomes "Honda Honda Activa E".
+ *
+ * Use this everywhere the public UI shows "Brand Model".
+ * The model-only form (card title under a brand label, H1 on the model
+ * page) should use `modelDisplayName` instead.
+ */
+export function displayName(brand: string | null | undefined, name: string | null | undefined): string {
+  const b = (brand || '').trim();
+  const n = (name || '').trim();
+  if (!b) return n;
+  if (!n) return b;
+  if (n.toLowerCase().startsWith(b.toLowerCase())) {
+    const rest = n.slice(b.length).replace(/^[\s-]+/, '');
+    return rest ? `${b} ${rest}` : n;
+  }
+  return `${b} ${n}`;
+}
+
+/** Model name with a leading brand stripped — for H1 / card title under a brand label. */
+export function modelDisplayName(brand: string | null | undefined, name: string | null | undefined): string {
+  const b = (brand || '').trim();
+  const n = (name || '').trim();
+  if (!n) return '';
+  if (b && n.toLowerCase().startsWith(b.toLowerCase())) {
+    const rest = n.slice(b.length).replace(/^[\s-]+/, '');
+    return rest || n;
+  }
+  return n;
+}
+
+/**
+ * Canonical model name for storage in `products.name`.
+ * Always store the model WITHOUT the brand prefix so
+ *   brand.label + " " + products.name  never doubles up.
+ * CSV / AI may send "Hero Xtreme 125R" — this returns "Xtreme 125R".
+ */
+export function cleanModelName(brand: string | null | undefined, name: string | null | undefined): string {
+  return modelDisplayName(brand, name) || (name || '').trim();
+}
+
 /** Parse a stored text field into a clean string array.
  *  Handles: real JSON arrays, JSON strings, the literal 'null' (form bug), and plain newline text. */
 export function toStrArray(v: unknown): string[] {

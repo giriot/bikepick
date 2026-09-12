@@ -162,6 +162,19 @@ const PG_RUNTIME_MIGRATIONS: { name: string; sql: string }[] = [
   },
 ];
 
+/** One-shot data cleanups that need JS (not pure SQL). Tracked in schema_migrations. */
+const PG_RUNTIME_DATA_JOBS: { name: string; run: () => Promise<string> }[] = [
+  {
+    name: 'rt_catalogue_dedupe_2026_09',
+    run: async () => {
+      // Lazy import so the cleanup module is not pulled into every cold start
+      // after the job has already been applied.
+      const { runCatalogueCleanup } = await import('./catalogue-cleanup');
+      return runCatalogueCleanup();
+    },
+  },
+];
+
 async function applyPgRuntimeMigrations(pool: any) {
   await pool.query(
     `CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, applied_at TEXT NOT NULL)`,
@@ -174,6 +187,28 @@ async function applyPgRuntimeMigrations(pool: any) {
       'INSERT INTO schema_migrations (id, name, applied_at) VALUES ($1, $2, $3) ON CONFLICT (name) DO NOTHING',
       [uid('mig'), m.name, nowIso()],
     );
+  }
+  // Data jobs run AFTER schema migrations, still once-only. Failures are
+  // logged but do not mark the job done, so a later cold start retries.
+  for (const job of PG_RUNTIME_DATA_JOBS) {
+    const done = await pool.query('SELECT 1 FROM schema_migrations WHERE name = $1', [job.name]);
+    if (done.rows.length) continue;
+    try {
+      const summary = await job.run();
+      console.log(`[db] runtime data job ${job.name}: ${summary}`);
+      // Catalogue cleanup returns "failed: …" instead of throwing — do not
+      // mark done so the next cold start retries.
+      if (typeof summary === 'string' && /^failed\b/i.test(summary)) {
+        console.error(`[db] runtime data job ${job.name} reported failure (will retry)`);
+        continue;
+      }
+      await pool.query(
+        'INSERT INTO schema_migrations (id, name, applied_at) VALUES ($1, $2, $3) ON CONFLICT (name) DO NOTHING',
+        [uid('mig'), job.name, nowIso()],
+      );
+    } catch (e) {
+      console.error(`[db] runtime data job ${job.name} failed (will retry):`, e);
+    }
   }
 }
 

@@ -7,16 +7,23 @@ import { db, nowIso } from './db';
  * single source of truth (ex-showroom). Products without variants keep
  * whatever price was set (e.g. by the seed).
  */
-export async function syncProductPricesFromVariants(variantId: string): Promise<void> {
-  const v = await db.get<any>('SELECT product_id FROM product_variants WHERE id = ?', [variantId]);
-  if (!v?.product_id) return;
+/** Recompute price_min/max for a product from its live variants. */
+export async function syncProductIdPrices(productId: string): Promise<void> {
+  if (!productId) return;
   const rows = await db.all<any>(
     'SELECT price FROM product_variants WHERE product_id = ? AND deleted_at IS NULL AND price IS NOT NULL AND price > 0',
-    [v.product_id],
+    [productId],
   );
   if (!rows.length) return; // no priced variants — leave the existing range untouched
   const prices = rows.map((r) => Number(r.price));
   const min = Math.min(...prices);
   const max = Math.max(...prices);
-  await db.run('UPDATE products SET price_min = ?, price_max = ?, updated_at = ? WHERE id = ?', [min, max, nowIso(), v.product_id]);
+  await db.run('UPDATE products SET price_min = ?, price_max = ?, updated_at = ? WHERE id = ?', [min, max, nowIso(), productId]);
+}
+
+/** Convenience: look up the product from a variant id, then recompute. */
+export async function syncProductPricesFromVariants(variantId: string): Promise<void> {
+  const v = await db.get<any>('SELECT product_id FROM product_variants WHERE id = ?', [variantId]);
+  if (!v?.product_id) return;
+  await syncProductIdPrices(v.product_id);
 }

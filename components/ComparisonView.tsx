@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { buildComparison, type CompareEntity } from '@/lib/compare';
 import { computeScore, DEFAULT_WEIGHTS, explainWin, type ScoreWeights } from '@/lib/score';
-import { inr } from '@/lib/format';
+import { displayName, inr, modelDisplayName } from '@/lib/format';
 import { breadcrumbJsonLd, JsonLd } from '@/lib/seo';
 import { Breadcrumbs, ScoreRing, SectionHeader } from '@/components/ui';
 import { QuickCompare } from '@/components/QuickCompare';
@@ -45,11 +45,11 @@ export function ComparisonView({ entities, picker, ids, title, crumbs, weights =
           {scores.map(({ entity, result }) => (
             <div key={entity.id} className="card p-3 text-center">
               <div className="product-stage aspect-[8/5]">
-                <Image src={entity.image || '/media/commuter.svg'} alt={`${entity.brand} ${entity.name}`} width={280} height={175} className="h-full w-full object-contain" />
+                <Image src={entity.image || '/media/commuter.svg'} alt={displayName(entity.brand, entity.name)} width={280} height={175} className="h-full w-full object-contain" />
               </div>
               <p className="mt-2 text-[11px] uppercase tracking-wide text-ink-mute">{entity.brand}</p>
               <Link href={`/${entity.fuelType === 'electric' ? 'electric' : 'bikes'}/${entity.brandSlug}/${entity.slug}`} className="block text-[14px] font-semibold leading-snug hover:text-brand-600">
-                {entity.name}
+                {modelDisplayName(entity.brand, entity.name)}
               </Link>
               <p className="mt-1 text-[15px] font-bold">{inr(entity.price)}</p>
               <p className="text-[10.5px] text-ink-mute">ex-showroom</p>
@@ -65,7 +65,7 @@ export function ComparisonView({ entities, picker, ids, title, crumbs, weights =
         <SectionHeader title="Verdict" subtitle="Computed from the comparison table — not from advertising." />
         <div className="card p-5">
           <p className="text-[14px] font-semibold">
-            {explainWin(`${winner.entity.brand} ${winner.entity.name}`, winner.result, scores.filter((s) => s.entity.id !== winner.entity.id).map((s) => ({ name: `${s.entity.brand} ${s.entity.name}`, result: s.result })))}
+            {explainWin(displayName(winner.entity.brand, winner.entity.name), winner.result, scores.filter((s) => s.entity.id !== winner.entity.id).map((s) => ({ name: displayName(s.entity.brand, s.entity.name), result: s.result })))}
           </p>
           <ul className="mt-3 space-y-1.5">
             {verdict.map((v) => (
@@ -89,7 +89,7 @@ export function ComparisonView({ entities, picker, ids, title, crumbs, weights =
                   <tr>
                     <th scope="col" className="w-[180px] text-left text-[11px] uppercase tracking-wide text-ink-mute">Attribute</th>
                     {entities.map((e) => (
-                      <th key={e.id} scope="col" className="text-left text-[12px] font-semibold">{e.brand} {e.name}</th>
+                      <th key={e.id} scope="col" className="text-left text-[12px] font-semibold">{displayName(e.brand, e.name)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -121,7 +121,7 @@ export function ComparisonView({ entities, picker, ids, title, crumbs, weights =
       <div className="mt-8 flex flex-wrap gap-2">
         {entities.map((e) => (
           <Link key={e.id} href={`/${e.fuelType === 'electric' ? 'electric' : 'bikes'}/${e.brandSlug}/${e.slug}`} className="btn-outline btn-sm">
-            View {e.name} →
+            View {modelDisplayName(e.brand, e.name)} →
           </Link>
         ))}
       </div>

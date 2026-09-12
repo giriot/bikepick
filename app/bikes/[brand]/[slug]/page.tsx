@@ -9,7 +9,7 @@ import { getJsonSetting } from '@/lib/settings';
 import { computeScore, DEFAULT_WEIGHTS, type ScoreWeights } from '@/lib/score';
 import { runningCostPerKm } from '@/lib/compare';
 import { projectResale } from '@/lib/calculators';
-import { inr, num, yesNo, dateIn, relative, toStrArray } from '@/lib/format';
+import { inr, num, yesNo, dateIn, relative, toStrArray, displayName, modelDisplayName } from '@/lib/format';
 import { buildMetadata, breadcrumbJsonLd, productJsonLd, JsonLd } from '@/lib/seo';
 import { Breadcrumbs, Notice, ScoreRing, SectionHeader, TrustBadge } from '@/components/ui';
 import { LeadDialog } from '@/components/LeadDialog';
@@ -35,16 +35,18 @@ export async function generateMetadata({ params }: Params) {
   if (!data) return buildMetadata({ title: 'Model not found', description: 'This model is not available.', path: '/bikes', robots: 'noindex,follow' });
   const { product } = data;
   const isEv = product.fuel_type === 'electric';
+  const fullName = displayName(product.brand_name, product.name);
+  const modelName = modelDisplayName(product.brand_name, product.name);
   const seo = await db.get<any>("SELECT * FROM seo_metadata WHERE entity_type='product' AND entity_id = ?", [product.id]);
   const path = `/${isEv ? 'electric' : 'bikes'}/${product.brand_slug}/${product.slug}`;
   return buildMetadata({
-    title: seo?.title || `${product.brand_name} ${product.name} — Price, Specifications, Mileage & Review`,
+    title: seo?.title || `${fullName} — Price, Specifications, Mileage & Review`,
     description:
       seo?.description ||
-      `${product.brand_name} ${product.name} price from ${inr(product.price_min)} ex-showroom. Full specifications, Bikepick Score, running cost, dealer offers, pros and cons.`,
+      `${fullName} price from ${inr(product.price_min)} ex-showroom. Full specifications, Bikepick Score, running cost, dealer offers, pros and cons.`,
     path,
     image: data.images[0]?.image_url,
-    keywords: [`${product.brand_name} ${product.name}`, `${product.name} price`, `${product.name} specifications`, `${product.name} mileage`],
+    keywords: [fullName, `${modelName} price`, `${modelName} specifications`, `${modelName} mileage`],
   });
 }
 
@@ -56,6 +58,8 @@ export default async function ProductPage({ params, searchParams }: Params) {
   const isEv = product.fuel_type === 'electric';
   const isCng = product.fuel_type === 'cng' || product.fuel_type === 'hybrid' || product.fuel_type === 'cng_petrol';
   const fuelLabel = isEv ? 'Electric' : isCng ? 'CNG + Petrol' : 'Petrol';
+  const fullName = displayName(product.brand_name, product.name);
+  const modelName = modelDisplayName(product.brand_name, product.name);
 
   // On-road (approx.) shown next to ex-showroom — from researched variant on-road prices.
   const onRoadPrices = variants
@@ -233,15 +237,15 @@ export default async function ProductPage({ params, searchParams }: Params) {
     { name: 'Home', url: '/' },
     { name: isEv ? 'Electric' : 'Bikes & Scooters', url: `/${base}` },
     { name: product.brand_name, url: `/${base}?brand=${product.brand_slug}` },
-    { name: product.name, url: `/${base}/${product.brand_slug}/${product.slug}` },
+    { name: modelName, url: `/${base}/${product.brand_slug}/${product.slug}` },
   ];
 
   return (
     <>
       <JsonLd data={breadcrumbJsonLd(crumbs)} />
       <JsonLd data={productJsonLd({
-        name: `${product.brand_name} ${product.name}`,
-        description: product.description || `${product.brand_name} ${product.name} specifications and price.`,
+        name: fullName,
+        description: product.description || `${fullName} specifications and price.`,
         brand: product.brand_name,
         image: images[0]?.image_url, url: `/${base}/${product.brand_slug}/${product.slug}`,
         price: product.price_min, offerCount: offers.length,
@@ -258,7 +262,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
               isEv={isEv}
               isDemo={product.is_demo === 1}
               brandName={product.brand_name}
-              productName={product.name}
+              productName={modelName}
             />
 
             {/* Below the gallery: editorial highlights only (no repeated specs) —
@@ -273,7 +277,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
                       <Image src={s.image_url || '/media/commuter.svg'} alt="" width={56} height={36} className="h-9 w-14 shrink-0 object-contain" />
                       <div className="min-w-0 flex-1">
                         <Link href={`/${s.fuel_type === 'electric' ? 'electric' : 'bikes'}/${s.brand_slug}/${s.slug}`} className="block truncate text-[12.5px] font-medium hover:text-brand-600">
-                          {s.brand_name} {s.name}
+                          {displayName(s.brand_name, s.name)}
                         </Link>
                         <p className="text-[11px] text-ink-mute">{inr(s.price_min)} · Score {s.score ?? '—'}</p>
                       </div>
@@ -315,7 +319,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
               )}
               {product.brand_name}
             </p>
-            <h1 className="mt-1 text-3xl font-bold tracking-[-0.035em] sm:text-[38px]">{product.name}</h1>
+            <h1 className="mt-1 text-3xl font-bold tracking-[-0.035em] sm:text-[38px]">{modelName}</h1>
             <p className="mt-2 text-sm leading-6 text-ink-mute">{product.description}</p>
 
             <div className="mt-5 flex flex-wrap items-center gap-4 rounded-2xl border border-line bg-surface p-4">
@@ -478,7 +482,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
                               href={`/${s.fuel_type === 'electric' ? 'electric' : 'bikes'}/${s.brand_slug}/${s.slug}`}
                               className="min-w-0 truncate font-medium hover:text-brand-600 hover:underline"
                             >
-                              {s.brand_name} {s.name}
+                              {displayName(s.brand_name, s.name)}
                             </Link>
                             <span className="shrink-0 text-right">
                               <span className="font-bold text-accent-dark">{inr(s.price_min)}</span>
@@ -513,7 +517,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
                                 href={`/electric/${s.brand_slug}/${s.slug}`}
                                 className="min-w-0 truncate font-medium hover:text-brand-600 hover:underline"
                               >
-                                {s.brand_name} {s.name}
+                                {displayName(s.brand_name, s.name)}
                               </Link>
                               <span className="shrink-0 text-right leading-tight">
                                 <span className="font-bold text-brand-700">{inr(s.price)}</span>
@@ -572,7 +576,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
             <div className="mt-5 grid grid-cols-2 gap-2">
               <LeadDialog
                 leadType="best_price" label="Get best price" className="btn-primary btn-sm"
-                title="Get the best price" description={`Share your details and verified dealers for the ${product.name} in your city will contact you with their best offer.`}
+                title="Get the best price" description={`Share your details and verified dealers for the ${modelName} in your city will contact you with their best offer.`}
                 productId={product.id} source={`product:${product.slug}`}
                 defaults={{ name: user?.full_name || '', phone: user?.phone || '', email: user?.email || '', city: user?.city || '' }}
               />
@@ -599,7 +603,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
             </div>
 
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <CompareToggle productId={product.id} label={`${product.brand_name} ${product.name}`} className="w-full" />
+              <CompareToggle productId={product.id} label={fullName} className="w-full" />
               <PriceAlertButton productId={product.id} currentPrice={product.price_min} signedIn={!!user} />
             </div>
             <div className="mt-2">
@@ -667,7 +671,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
           </p>
         </section>
 
-        <SpecSuggestionForm productId={product.id} productName={product.name} />
+        <SpecSuggestionForm productId={product.id} productName={modelName} />
 
         <AdSlot slotKey="product_below_specs" className="mt-8" />
 
@@ -719,7 +723,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
         {/* ------------------------------ USED ------------------------------ */}
         <section className="mt-12">
           <div>
-            <SectionHeader title={`Used ${product.name}`} subtitle="Approved listings currently on the marketplace." />
+            <SectionHeader title={`Used ${modelName}`} subtitle="Approved listings currently on the marketplace." />
             {usedOfModel.items.length === 0 ? (
               <div className="card p-5 text-sm text-ink-mute">
                 No approved used listings for this model right now.{' '}

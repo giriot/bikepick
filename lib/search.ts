@@ -1,6 +1,10 @@
 import 'server-only';
 import { db } from './db';
 import { normalizeKey, searchTokens, fuzzyMatches } from './slug';
+import { displayName } from './format';
+
+// Re-export so existing `import { displayName } from '@/lib/search'` keeps working.
+export { displayName };
 
 export interface SearchHit {
   id: string;
@@ -12,21 +16,6 @@ export interface SearchHit {
   rank: number;
 }
 export interface SearchGroup { key: string; label: string; hits: SearchHit[] }
-
-/**
- * Some records store the brand inside the model name (\"Honda Activa E\"),
- * so a naive `${brand} ${name}` renders as \"Honda Honda Activa E\". Join
- * the two without repeating the brand.
- */
-export function displayName(brand: string, name: string): string {
-  const b = (brand || '').trim();
-  const n = (name || '').trim();
-  if (b && n.toLowerCase().startsWith(b.toLowerCase())) {
-    const rest = n.slice(b.length).replace(/^[\s-]+/, '');
-    return rest ? `${b} ${rest}` : n;
-  }
-  return b && n ? `${b} ${n}` : n || b;
-}
 export interface SearchResult {
   groups: SearchGroup[];
   /** Best typo-corrected product name when the literal query matched nothing, else null. */

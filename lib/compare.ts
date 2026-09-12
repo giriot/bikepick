@@ -206,8 +206,18 @@ function buildVerdict(entities: CompareEntity[], rows: CompareRow[]): string[] {
   return entities
     .map((e) => {
       const w = wins.get(e.id) || [];
-      if (!w.length) return `${e.brand} ${e.name} does not lead any measured attribute in this comparison.`;
-      return `${e.brand} ${e.name} leads on ${w.length} attribute${w.length > 1 ? 's' : ''}: ${w.slice(0, 6).join(', ')}${w.length > 6 ? ` and ${w.length - 6} more` : ''}.`;
+      // brand+name may already include the brand ("TVS Raider 125") — strip once.
+      const label = (() => {
+        const b = (e.brand || '').trim();
+        const n = (e.name || '').trim();
+        if (b && n.toLowerCase().startsWith(b.toLowerCase())) {
+          const rest = n.slice(b.length).replace(/^[\s-]+/, '');
+          return rest ? `${b} ${rest}` : n;
+        }
+        return b && n ? `${b} ${n}` : n || b;
+      })();
+      if (!w.length) return `${label} does not lead any measured attribute in this comparison.`;
+      return `${label} leads on ${w.length} attribute${w.length > 1 ? 's' : ''}: ${w.slice(0, 6).join(', ')}${w.length > 6 ? ` and ${w.length - 6} more` : ''}.`;
     })
     .sort((a, b) => b.length - a.length);
 }

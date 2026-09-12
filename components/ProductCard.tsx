@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { inr } from '@/lib/format';
+import { displayName, inr, modelDisplayName } from '@/lib/format';
 import type { ProductCard as Card } from '@/lib/queries';
 import { CompareToggle } from './CompareToggle';
 import { EthanolBadge } from './EthanolBadge';
@@ -9,14 +9,16 @@ export function ProductCard({ p, showCompare = true }: { p: Card; showCompare?: 
   const isEv = p.fuel_type === 'electric';
   const href = `/${isEv ? 'electric' : 'bikes'}/${p.brand_slug}/${p.slug}`;
   const range = p.real_world_range_km || p.claimed_range_km;
+  const full = displayName(p.brand_name, p.name);
+  const model = modelDisplayName(p.brand_name, p.name);
   const alt = (p.alt_text || '')
     .replace(/\(AI illustration\)/gi, '')
     .replace(/·\s*AI illustration/gi, '')
-    .trim() || `${p.brand_name} ${p.name}`;
+    .trim() || full;
 
   return (
     <article className="card card-hover group flex flex-col overflow-hidden">
-      <Link href={href} className="product-stage aspect-[8/5] w-full" aria-label={`${p.brand_name} ${p.name}`}>
+      <Link href={href} className="product-stage aspect-[8/5] w-full" aria-label={full}>
         <Image
           src={p.image_url || '/media/commuter.svg'}
           alt={alt}
@@ -37,7 +39,7 @@ export function ProductCard({ p, showCompare = true }: { p: Card; showCompare?: 
       <div className="flex flex-1 flex-col p-4">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-mute">{p.brand_name}</p>
         <h3 className="mt-0.5 text-[15px] font-semibold leading-snug">
-          <Link href={href} className="hover:text-brand-600">{p.name}</Link>
+          <Link href={href} className="hover:text-brand-600">{model}</Link>
         </h3>
 
         <div className="mt-2 flex items-baseline gap-2">
@@ -63,7 +65,7 @@ export function ProductCard({ p, showCompare = true }: { p: Card; showCompare?: 
 
         <div className="mt-4 flex items-center gap-2">
           <Link href={href} className="btn-outline btn-sm flex-1">View details</Link>
-          {showCompare && <CompareToggle productId={p.id} label={`${p.brand_name} ${p.name}`} />}
+          {showCompare && <CompareToggle productId={p.id} label={full} />}
         </div>
       </div>
     </article>
