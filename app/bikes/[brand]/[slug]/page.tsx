@@ -501,8 +501,8 @@ export default async function ProductPage({ params, searchParams }: Params) {
                     <div className="mt-2.5 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2.5">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-brand-700">
                         ⚡ {evMode === 'bike'
-                          ? `EV motorcycles near ${inr(bikePrice ?? 0)} ex-showroom`
-                          : `EV scooters near ${inr(bikePrice ?? 0)} ex-showroom`}
+                          ? `EV motorcycles at matching cost (near ${inr(bikePrice ?? 0)})`
+                          : `EV scooters at matching cost (near ${inr(bikePrice ?? 0)})`}
                       </p>
                       <ul className="mt-1.5 space-y-1.5">
                         {evSuggest.map((s) => {
@@ -533,7 +533,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
                       </ul>
                       <p className="mt-1.5 text-[10px] leading-4 text-ink-mute">
                         {evBandHits > 0
-                          ? `Picked from EVs priced within ±10% of this ${isScooter ? 'scooter' : 'bike'} (${inr(bandLo ?? 0)}–${inr(bandHi ?? 0)} ex-showroom), with honest ≈₹/km running costs.`
+                          ? `EVs priced closest to this ${isScooter ? 'scooter' : 'bike'} (${inr(bandLo ?? 0)}–${inr(bandHi ?? 0)} ex-showroom), with honest ≈₹/km running costs.`
                           : `No EV on Bikepick is priced within ±10% of this ${isScooter ? 'scooter' : 'bike'} yet — nearest-priced EVs shown with the gap.`}
                       </p>
                     </div>
