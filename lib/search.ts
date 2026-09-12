@@ -96,13 +96,18 @@ export async function globalSearch(query: string, limitPerGroup = 6): Promise<Se
   const nk = normalizeKey(q);
   const tokens = searchTokens(q).slice(0, 5);
   const like = `%${q.toLowerCase()}%`;
+  // A spec token ("e100", "abs", "160cc"…) must not fall through to the
+  // name search, where a substring like "shine100" would false-positive.
+  const facet = detectSpecFacet(q);
 
   const tokenClause = tokens.length
     ? tokens.map(() => `(LOWER(b.name || ' ' || p.name) LIKE ? OR p.normalized_key LIKE ?)`).join(' AND ')
     : '1=1';
   const tokenParams = tokens.flatMap((t) => [`%${t}%`, `%${normalizeKey(t)}%`]);
 
-  const products = await db.all<any>(
+  const products = facet
+    ? []
+    : await db.all<any>(
     `SELECT p.id, p.name, p.slug, p.fuel_type, p.price_min, p.score, p.normalized_key,
             b.name AS brand_name, b.slug AS brand_slug, c.slug AS category_slug,
             (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.approved = 1
@@ -143,7 +148,7 @@ export async function globalSearch(query: string, limitPerGroup = 6): Promise<Se
   // Only matches the literal pass missed, ranked below any literal hit.
   const literalIds = new Set(literalProductHits.map((h) => h.id));
   let fuzzyProductHits: SearchHit[] = [];
-  if (literalProductHits.length < limitPerGroup) {
+  if (!facet && literalProductHits.length < limitPerGroup) {
     const all = await db.all<any>(
       `SELECT p.id, p.name, p.slug, p.fuel_type, p.price_min, p.score, p.normalized_key,
               b.name AS brand_name, b.slug AS brand_slug, c.slug AS category_slug,
@@ -172,26 +177,18 @@ export async function globalSearch(query: string, limitPerGroup = 6): Promise<Se
   const didYouMean =
     literalProductHits.length === 0 && fuzzyProductHits.length > 0 ? fuzzyProductHits[0].title : null;
 
-  // Specification facets ("e100", "abs", "disc", "led", "160cc"…) match by
-  // recorded spec rather than name, so a spec search is never empty.
-  const facet = detectSpecFacet(q);
+  // A spec facet owns the results entirely: its bikes carry the facet label
+  // (e.g. "ABS", "E20 ready") so the page explains why each bike matched.
   if (facet) {
-    const facetRows = await facetProductRows(facet, limitPerGroup);
-    const ids = new Set(productHits.map((h) => h.id));
-    for (const r of facetRows) {
-      if (productHits.length >= limitPerGroup) break;
-      if (ids.has(r.id)) continue;
-      ids.add(r.id);
-      productHits.push({
-        id: r.id,
-        title: displayName(r.brand_name, r.name),
-        subtitle: facet.label,
-        url: `/${r.fuel_type === 'electric' ? 'electric' : 'bikes'}/${r.brand_slug}/${r.slug}`,
-        image: r.image_url,
-        meta: r.price_min ? `₹${Math.round(r.price_min).toLocaleString('en-IN')} onwards, ex-showroom` : null,
-        rank: 20,
-      });
-    }
+    productHits = (await facetProductRows(facet, limitPerGroup)).map((r) => ({
+      id: r.id,
+      title: displayName(r.brand_name, r.name),
+      subtitle: facet.label,
+      url: `/${r.fuel_type === 'electric' ? 'electric' : 'bikes'}/${r.brand_slug}/${r.slug}`,
+      image: r.image_url,
+      meta: r.price_min ? `₹${Math.round(r.price_min).toLocaleString('en-IN')} onwards, ex-showroom` : null,
+      rank: 30,
+    }));
   }
 
   const used = await db.all<any>(
@@ -259,6 +256,25 @@ export async function suggest(query: string, limit = 8): Promise<{ label: string
   const nk = normalizeKey(q);
   const like = `%${q.toLowerCase()}%`;
 
+  // A spec token owns the dropdown: "e100" lists flex-fuel bikes, "abs" lists
+  // ABS bikes — no name fallthrough that would false-positive on "shine100".
+  const facet = detectSpecFacet(q);
+  if (facet) {
+    const rowsF = await db.all<any>(
+      `SELECT p.name, p.slug, p.fuel_type, b.name AS brand_name, b.slug AS brand_slug, c.slug AS category_slug, p.normalized_key
+         FROM products p JOIN brands b ON b.id = p.brand_id JOIN categories c ON c.id = p.category_id
+         ${facet.joins}
+        WHERE p.status = 'published' AND p.deleted_at IS NULL AND ${facet.where}
+        ORDER BY p.popularity DESC LIMIT ?`,
+      [limit],
+    );
+    return rowsF.map((r) => ({
+      label: displayName(r.brand_name, r.name),
+      url: `/${r.fuel_type === 'electric' ? 'electric' : 'bikes'}/${r.brand_slug}/${r.slug}`,
+      kind: facet.label,
+    }));
+  }
+
   const rows = await db.all<any>(
     `SELECT p.name, p.slug, p.fuel_type, b.name AS brand_name, b.slug AS brand_slug, c.slug AS category_slug, p.normalized_key
        FROM products p JOIN brands b ON b.id = p.brand_id JOIN categories c ON c.id = p.category_id
@@ -290,32 +306,6 @@ export async function suggest(query: string, limit = 8): Promise<{ label: string
       url: `/${r.fuel_type === 'electric' ? 'electric' : 'bikes'}/${r.brand_slug}/${r.slug}`,
       kind: 'product',
     }));
-
-  // Specification facet matches ("e100" → flex-fuel bikes, "abs" → ABS bikes…),
-  // labelled with the spec so the dropdown explains why they appear.
-  const facet = detectSpecFacet(q);
-  if (facet) {
-    const seen = new Set(out.map((o) => o.label));
-    const rowsF = await db.all<any>(
-      `SELECT p.name, p.slug, p.fuel_type, b.name AS brand_name, b.slug AS brand_slug, c.slug AS category_slug, p.normalized_key
-         FROM products p JOIN brands b ON b.id = p.brand_id JOIN categories c ON c.id = p.category_id
-         ${facet.joins}
-        WHERE p.status = 'published' AND p.deleted_at IS NULL AND ${facet.where}
-        ORDER BY p.popularity DESC LIMIT ?`,
-      [limit],
-    );
-    for (const r of rowsF) {
-      if (out.length >= limit) break;
-      const lbl = displayName(r.brand_name, r.name);
-      if (seen.has(lbl)) continue;
-      seen.add(lbl);
-      out.push({
-        label: lbl,
-        url: `/${r.fuel_type === 'electric' ? 'electric' : 'bikes'}/${r.brand_slug}/${r.slug}`,
-        kind: facet.label,
-      });
-    }
-  }
 
   if (out.length < limit) {
     const used = await db.all<any>(
