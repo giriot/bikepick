@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { getProductBySlug, listProducts, listUsedBikes } from '@/lib/queries';
-import { EthanolBadge } from '@/components/EthanolBadge';
+import { RoundEthanolBadge } from '@/components/EthanolBadge';
 import { getCurrentUser } from '@/lib/auth';
 import { getJsonSetting } from '@/lib/settings';
 import { computeScore, DEFAULT_WEIGHTS, type ScoreWeights } from '@/lib/score';
@@ -155,34 +155,46 @@ export default async function ProductPage({ params, searchParams }: Params) {
     ? (segRange != null ? `EVs · ~${Math.round(segRange)} km range` : 'this segment')
     : (segCc != null ? `~${Math.round(segCc)} cc ${isScooter ? 'scooters' : 'bikes'}` : 'this segment');
 
-  // "EVs to check at the same mileage" — up to 2 electric models (same body
-  // type where possible) as a cross-fuel alternative. Petrol pages only.
+  // "EVs to check at the same running cost" — electric models (same body type
+  // where possible) whose petrol-equivalent mileage is nearest this bike's
+  // mileage, computed honestly from each EV's cost per km. Petrol pages only.
+  const PETROL_PRICE = 104.5; // ₹/L — same tariff the ownership calculator uses
+  const bikeKmpL = !isEv ? Number(bike?.mileage_kmpl || 0) || null : null;
   let evSuggest: any[] = [];
   if (!isEv) {
-    evSuggest = await db.all<any>(
-      `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type, p.body_type,
-              b.name AS brand_name, b.slug AS brand_slug,
-              COALESCE(es.claimed_range_km, es.real_world_range_km) AS range_km
-         FROM products p
-         JOIN brands b ON b.id = p.brand_id
-         JOIN ev_specs es ON es.product_id = p.id AND es.variant_id IS NULL
-        WHERE p.status = 'published' AND p.deleted_at IS NULL
-          AND p.fuel_type = 'electric' AND ${bodyScope}
-        ORDER BY p.popularity DESC LIMIT 2`,
-    );
-    if (evSuggest.length === 0) {
-      evSuggest = await db.all<any>(
+    const fetchEvs = (scoped: boolean) =>
+      db.all<any>(
         `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type, p.body_type,
                 b.name AS brand_name, b.slug AS brand_slug,
-                COALESCE(es.claimed_range_km, es.real_world_range_km) AS range_km
+                es.running_cost_per_km, es.real_world_range_km, es.claimed_range_km, es.battery_capacity_kwh
            FROM products p
            JOIN brands b ON b.id = p.brand_id
            JOIN ev_specs es ON es.product_id = p.id AND es.variant_id IS NULL
           WHERE p.status = 'published' AND p.deleted_at IS NULL
-            AND p.fuel_type = 'electric'
-          ORDER BY p.popularity DESC LIMIT 2`,
+            AND p.fuel_type = 'electric' ${scoped ? `AND ${bodyScope}` : ''}`,
       );
-    }
+    let evs = await fetchEvs(true);
+    if (evs.length === 0) evs = await fetchEvs(false);
+
+    // Cost per km: recorded figure, else battery ÷ real-world range at the
+    // same tariff/charger efficiency used in the EV-vs-petrol calculator.
+    const evCostKm = (r: any) => {
+      const rc = Number(r.running_cost_per_km);
+      if (rc > 0) return rc;
+      const range = Number(r.real_world_range_km) || (Number(r.claimed_range_km) || 0) * 0.75;
+      const kwh = Number(r.battery_capacity_kwh);
+      if (range > 0 && kwh > 0) return (kwh / range) * (8 / 0.85);
+      return null;
+    };
+
+    evSuggest = evs
+      .map((r) => {
+        const c = evCostKm(r);
+        return { ...r, cost_km: c, eq_kmpl: c ? PETROL_PRICE / c : null };
+      })
+      .filter((r) => r.eq_kmpl != null)
+      .sort((a, b) => Math.abs((a.eq_kmpl ?? 0) - (bikeKmpL ?? 0)) - Math.abs((b.eq_kmpl ?? 0) - (bikeKmpL ?? 0)))
+      .slice(0, 2);
   }
 
   // Similar models (below gallery) — same body type only; fall back to any.
@@ -281,11 +293,6 @@ export default async function ProductPage({ params, searchParams }: Params) {
               {product.brand_name}
             </p>
             <h1 className="mt-1 text-3xl font-bold tracking-[-0.035em] sm:text-[38px]">{product.name}</h1>
-            {product.ethanol_blend && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <EthanolBadge blend={product.ethanol_blend} size="md" />
-              </div>
-            )}
             <p className="mt-2 text-sm leading-6 text-ink-mute">{product.description}</p>
 
             <div className="mt-5 flex flex-wrap items-center gap-4 rounded-2xl border border-line bg-surface p-4">
@@ -299,6 +306,11 @@ export default async function ProductPage({ params, searchParams }: Params) {
                   <p className="text-[12px] text-ink-mute">
                     On-road approx. <span className="font-semibold text-ink">{inr(onRoadMin)}</span> (est., before personalisation)
                   </p>
+                )}
+                {!isEv && (
+                  <div className="mt-2.5">
+                    <RoundEthanolBadge blend={product.ethanol_blend} />
+                  </div>
                 )}
               </div>
               <div className="ml-auto flex items-center gap-4">
@@ -449,10 +461,12 @@ export default async function ProductPage({ params, searchParams }: Params) {
                     </div>
                   ) : null}
 
-                  {/* EVs to check at the same mileage (cross-fuel suggestion) */}
+                  {/* EVs at a matching running cost (cross-fuel suggestion) */}
                   {evSuggest.length > 0 && (
                     <div className="mt-2.5 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2.5">
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-brand-700">⚡ EVs to check at same mileage</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-brand-700">
+                        ⚡ {isScooter ? 'EV scooters' : 'EVs'} at matching running cost
+                      </p>
                       <ul className="mt-1.5 space-y-1.5">
                         {evSuggest.map((s) => (
                           <li key={s.id} className="flex items-center justify-between gap-2 text-[12px]">
@@ -464,13 +478,20 @@ export default async function ProductPage({ params, searchParams }: Params) {
                             </Link>
                             <span className="shrink-0 text-right">
                               <span className="font-bold text-brand-700">{inr(s.price_min)}</span>
-                              {s.range_km != null && (
-                                <span className="ml-1 text-[10px] text-ink-mute">~{Math.round(s.range_km)} km</span>
+                              {s.cost_km != null && (
+                                <span className="ml-1 block text-[10px] text-ink-mute">
+                                  ≈₹{s.cost_km.toFixed(2)}/km{s.eq_kmpl != null ? ` · eq. ~${Math.round(s.eq_kmpl)} kmpl` : ''}
+                                </span>
                               )}
                             </span>
                           </li>
                         ))}
                       </ul>
+                      <p className="mt-1.5 text-[10px] leading-4 text-ink-mute">
+                        {bikeKmpL != null
+                          ? `This ${isScooter ? 'scooter' : 'bike'} runs at ≈₹${(PETROL_PRICE / bikeKmpL).toFixed(2)}/km (${Math.round(bikeKmpL)} kmpl). EVs on our site cost ₹0.25–0.5/km — the petrol-equivalent of roughly 200–400 kmpl.`
+                          : 'EVs on our site cost ₹0.25–0.5/km — the petrol-equivalent of roughly 200–400 kmpl.'}
+                      </p>
                     </div>
                   )}
 

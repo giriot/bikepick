@@ -50,3 +50,53 @@ function DropIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** Round fuel-cap style badge (as on the sticker below a fuel filler) for
+ *  placing beside the price. Code = E20 / E85 / E100 / E0. */
+const ROUND_META: Record<string, { code: string; label: string; note: string; cls: string }> = {
+  e20: {
+    code: 'E20',
+    label: 'E20 ready',
+    note: 'Runs on E20 — 20% ethanol (India\u2019s standard petrol)',
+    cls: 'from-emerald-500 to-green-600',
+  },
+  e85: {
+    code: 'E85',
+    label: 'Flex-fuel',
+    note: 'Runs on any blend from E20 up to E85',
+    cls: 'from-teal-500 to-emerald-600',
+  },
+  e100: {
+    code: 'E100',
+    label: 'Flex-fuel',
+    note: 'Runs on any blend from E20 up to E100',
+    cls: 'from-green-500 to-emerald-700',
+  },
+  none: {
+    code: 'E0',
+    label: 'Petrol only',
+    note: 'Not rated for ethanol blends',
+    cls: 'from-slate-400 to-slate-500',
+  },
+};
+
+export function RoundEthanolBadge({ blend }: { blend: EthanolBlend }) {
+  const meta = ROUND_META[blend || ''];
+  if (!meta) return null;
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span
+        className={`grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br text-white shadow-md ring-2 ring-white ${meta.cls}`}
+      >
+        <span className="flex flex-col items-center gap-0.5 leading-none">
+          <DropIcon className="h-3 w-3" />
+          <span className="text-[10.5px] font-extrabold tracking-tight">{meta.code}</span>
+        </span>
+      </span>
+      <span className="text-[11px] leading-4">
+        <span className="font-semibold">{meta.label}</span>
+        <span className="block text-ink-mute">{meta.note}</span>
+      </span>
+    </span>
+  );
+}
