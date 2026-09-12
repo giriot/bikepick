@@ -8,13 +8,17 @@ export function ProductCard({ p, showCompare = true }: { p: Card; showCompare?: 
   const isEv = p.fuel_type === 'electric';
   const href = `/${isEv ? 'electric' : 'bikes'}/${p.brand_slug}/${p.slug}`;
   const range = p.real_world_range_km || p.claimed_range_km;
+  const alt = (p.alt_text || '')
+    .replace(/\(AI illustration\)/gi, '')
+    .replace(/·\s*AI illustration/gi, '')
+    .trim() || `${p.brand_name} ${p.name}`;
 
   return (
     <article className="card card-hover group flex flex-col overflow-hidden">
       <Link href={href} className="product-stage aspect-[8/5] w-full" aria-label={`${p.brand_name} ${p.name}`}>
         <Image
           src={p.image_url || '/media/commuter.svg'}
-          alt={p.alt_text || `${p.brand_name} ${p.name} illustration`}
+          alt={alt}
           width={480}
           height={300}
           sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 300px"

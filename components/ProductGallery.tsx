@@ -73,7 +73,7 @@ export function ProductGallery({
       >
         <Image
           src={images[0]?.image_url || `/media/${isEv ? 'ev-scooter' : 'street'}.svg`}
-          alt={images[0]?.alt_text || `${brandName} ${productName}`}
+          alt={displayAlt(images[0]?.alt_text) || `${brandName} ${productName}`}
           width={880} height={550} priority
           sizes="(max-width: 1024px) 100vw, 620px"
           className="h-full w-full object-contain"
@@ -95,11 +95,11 @@ export function ProductGallery({
                 type="button"
                 onClick={() => setLightbox(i)}
                 className="product-stage aspect-[4/3] w-full cursor-zoom-in border border-line hover:border-brand-400"
-                aria-label={`Open image ${i + 1}: ${img.alt_text || ''}`}
+                aria-label={`Open image ${i + 1}: ${displayAlt(img.alt_text)}`}
               >
                 <Image
                   src={img.thumbnail_url || img.image_url}
-                  alt={img.alt_text || ''}
+                  alt={displayAlt(img.alt_text)}
                   width={160} height={120} loading="lazy"
                   className="h-full w-full object-contain"
                 />
@@ -141,7 +141,7 @@ export function ProductGallery({
             </button>
             <Image
               src={active.image_url}
-              alt={active.alt_text || `${brandName} ${productName}`}
+              alt={displayAlt(active.alt_text) || `${brandName} ${productName}`}
               width={1400} height={800}
               className="max-h-[76vh] max-w-full rounded-lg object-contain"
             />

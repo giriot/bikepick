@@ -106,15 +106,48 @@ export default async function ProductPage({ params, searchParams }: Params) {
   const cons: string[] = toStrArray(product.cons);
   const bestFor: string[] = (typeof product.best_for === 'string' ? product.best_for : '')
     .split(/[,;•]+/).map((s: string) => s.trim()).filter(Boolean);
-  // Same-segment models that cost LESS than this bike — a price-conscious hint
-  // (real data from the category listing, never invented).
-  const segmentHasOthers = (similar.items || []).some((s) => s.id !== product.id);
+  // "Segment" = engine capacity for petrol (cc), usable range for electric (km).
+  // Same-segment peers are matched on that, never on price alone, so a 125 cc
+  // bike is compared with other ~125 cc bikes (not, say, 160 cc machines).
+  const segCc = !isEv && bike?.engine_capacity_cc != null ? Number(bike.engine_capacity_cc) : null;
+  const segRange = isEv ? Number(ev?.claimed_range_km ?? ev?.real_world_range_km ?? 0) || null : null;
+  const segPeers = segCc != null
+    ? await db.all<any>(
+        `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type,
+                b.name AS brand_name, b.slug AS brand_slug
+           FROM products p
+           JOIN brands b ON b.id = p.brand_id
+           JOIN bike_specs bs ON bs.product_id = p.id AND bs.variant_id IS NULL
+          WHERE p.status = 'published' AND p.deleted_at IS NULL
+            AND p.fuel_type = 'petrol' AND p.id <> ?
+            AND bs.engine_capacity_cc IS NOT NULL
+            AND bs.engine_capacity_cc >= ? AND bs.engine_capacity_cc <= ?
+          ORDER BY p.price_min ASC LIMIT 8`,
+        [product.id, segCc * 0.9, segCc * 1.1],
+      )
+    : segRange != null
+      ? await db.all<any>(
+          `SELECT p.id, p.name, p.slug, p.price_min, p.fuel_type,
+                  b.name AS brand_name, b.slug AS brand_slug
+             FROM products p
+             JOIN brands b ON b.id = p.brand_id
+             JOIN ev_specs es ON es.product_id = p.id AND es.variant_id IS NULL
+            WHERE p.status = 'published' AND p.deleted_at IS NULL
+              AND p.fuel_type = 'electric' AND p.id <> ?
+              AND COALESCE(es.claimed_range_km, es.real_world_range_km) IS NOT NULL
+              AND COALESCE(es.claimed_range_km, es.real_world_range_km) >= ?
+              AND COALESCE(es.claimed_range_km, es.real_world_range_km) <= ?
+            ORDER BY p.price_min ASC LIMIT 8`,
+          [product.id, segRange * 0.8, segRange * 1.2],
+        )
+      : [];
+  const segmentHasOthers = segPeers.length > 0;
   const cheaper = product.price_min != null
-    ? (similar.items || [])
-        .filter((s) => s.id !== product.id && s.price_min != null && s.price_min < (product.price_min as number))
-        .sort((a, b) => (a.price_min ?? 0) - (b.price_min ?? 0))
-        .slice(0, 2)
+    ? segPeers.filter((s) => s.price_min != null && s.price_min < (product.price_min as number)).slice(0, 2)
     : [];
+  const segLabel = isEv
+    ? (segRange != null ? `EVs · ~${Math.round(segRange)} km range` : 'this segment')
+    : (segCc != null ? `~${Math.round(segCc)} cc bikes` : 'this segment');
   const approvedReviews = reviews;
   const avgRating = approvedReviews.length
     ? approvedReviews.reduce((a: number, r: any) => a + r.rating, 0) / approvedReviews.length
@@ -191,7 +224,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
                   </div>
                 ) : (
                   <p className="mt-1.5 text-[11.5px] leading-5 text-ink-mute">
-                    Not recorded yet — the admin saves pros &amp; cons from the AI template on the spec sheet.
+                    Not recorded yet — our editorial team is reviewing this model.
                   </p>
                 )}
               </div>
@@ -199,17 +232,21 @@ export default async function ProductPage({ params, searchParams }: Params) {
               <div>
                 <h3 className="text-[13.5px] font-semibold">Suitable for</h3>
                 {bestFor.length > 0 ? (
-                  <>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
+                  <div className="mt-2 rounded-xl border border-brand-100 bg-brand-50/70 p-3">
+                    <div className="flex flex-wrap gap-2">
                       {bestFor.map((b) => (
-                        <span key={b} className="rounded-full bg-surface px-2.5 py-1 text-[12px] text-ink-soft ring-1 ring-line">{b}</span>
+                        <span
+                          key={b}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12.5px] font-semibold text-brand-800 shadow-sm ring-1 ring-brand-200"
+                        >
+                          <span className="text-brand-500">✓</span>{b}
+                        </span>
                       ))}
                     </div>
-                    <p className="mt-1.5 text-[10.5px] text-ink-mute">From the AI template — saved by the admin.</p>
-                  </>
+                  </div>
                 ) : (
                   <p className="mt-1.5 text-[11.5px] leading-5 text-ink-mute">
-                    The admin records this from the AI template when the full specifications are generated.
+                    Which riders this model suits best will appear here once the editorial team records it.
                   </p>
                 )}
               </div>
@@ -362,7 +399,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
                   {/* Cheaper in this segment — price-conscious hint */}
                   {cheaper.length > 0 ? (
                     <div className="mt-3 rounded-lg border border-accent/25 bg-accent-soft/60 px-3 py-2.5">
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-accent-dark">💡 Cheaper in this segment</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-accent-dark">💡 Cheaper {segLabel}</p>
                       <ul className="mt-1.5 space-y-1.5">
                         {cheaper.map((s) => (
                           <li key={s.id} className="flex items-center justify-between gap-2 text-[12px]">
@@ -384,7 +421,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
                     </div>
                   ) : segmentHasOthers ? (
                     <div className="mt-3 rounded-lg border border-accent/25 bg-accent-soft/60 px-3 py-2.5 text-[12px] leading-5 text-accent-dark">
-                      <span className="font-bold">Most affordable in this segment</span> — no similar model is listed cheaper right now.
+                      <span className="font-bold">Most affordable {segLabel}</span> — no similar model is listed cheaper right now.
                     </div>
                   ) : null}
 
