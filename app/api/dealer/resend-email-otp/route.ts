@@ -5,7 +5,7 @@ import { requireUser } from '@/lib/auth';
 import { emailSchema } from '@/lib/validation';
 import { emailVerificationConfigured, sendDealerEmailOtp } from '@/lib/email-otp';
 import { handleError, ok, fail, readJson } from '@/lib/api';
-import { rateLimit } from '@/lib/ratelimit';
+import { rateLimit, refundRateLimit } from '@/lib/ratelimit';
 
 const schema = z.object({
   dealer_id: z.string().min(1).optional(),
@@ -35,7 +35,10 @@ export async function POST(req: NextRequest) {
     }
 
     const delivery = await sendDealerEmailOtp(email);
-    if (!delivery.delivered) return fail('Could not send the confirmation email. Please try again shortly.', 503);
+    if (!delivery.delivered) {
+      await refundRateLimit('dealer_email_otp', user.id);
+      return fail('Could not send the confirmation email. Please try again shortly.', 503);
+    }
     return ok({ email }, 'A new dealer email verification code was sent');
   } catch (e) {
     return handleError(e);

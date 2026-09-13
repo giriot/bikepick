@@ -44,3 +44,12 @@ export async function rateLimit(
   await db.run('UPDATE rate_limits SET hits = hits + 1, updated_at = ? WHERE bucket_key = ?', [nowIso(), bucket]);
   return { ok: true, remaining: limit - row.hits - 1, retryAfter: 0 };
 }
+
+/** Return one attempt when the protected operation never completed. */
+export async function refundRateLimit(action: string, key: string): Promise<void> {
+  const bucket = `${action}:${key}`;
+  await db.run(
+    'UPDATE rate_limits SET hits = CASE WHEN hits > 0 THEN hits - 1 ELSE 0 END, updated_at = ? WHERE bucket_key = ?',
+    [nowIso(), bucket],
+  );
+}

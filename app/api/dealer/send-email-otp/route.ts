@@ -3,7 +3,7 @@ import { requireUser } from '@/lib/auth';
 import { emailSchema } from '@/lib/validation';
 import { emailVerificationConfigured, sendDealerEmailOtp } from '@/lib/email-otp';
 import { handleError, ok, fail, readJson } from '@/lib/api';
-import { rateLimit } from '@/lib/ratelimit';
+import { rateLimit, refundRateLimit } from '@/lib/ratelimit';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +15,10 @@ export async function POST(req: NextRequest) {
     if (!limited.ok) return fail(`Too many verification emails. Try again in ${limited.retryAfter}s.`, 429);
 
     const delivery = await sendDealerEmailOtp(email);
-    if (!delivery.delivered) return fail('Could not send the dealer confirmation email. Please try again shortly.', 503);
+    if (!delivery.delivered) {
+      await refundRateLimit('dealer_email_otp', user.id);
+      return fail('Could not send the dealer confirmation email. Please try again shortly.', 503);
+    }
     return ok({ email }, 'A 6-digit verification code was sent to the dealer email');
   } catch (e) {
     return handleError(e);
