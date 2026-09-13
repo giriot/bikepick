@@ -46,9 +46,9 @@ const smtpProvider: EmailProvider = {
     Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
   async send(msg) {
     if (!this.configured()) return { delivered: false, provider: 'smtp', reason: 'not_configured' };
+    const port = Number(process.env.SMTP_PORT || 587);
     try {
       const nodemailer = require('nodemailer');
-      const port = Number(process.env.SMTP_PORT || 587);
       const transport = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port,
