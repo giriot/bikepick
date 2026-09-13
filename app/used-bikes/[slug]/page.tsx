@@ -187,7 +187,13 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
             <SaveButton usedBikeId={bike.id} initialSaved={isSaved} className="btn-outline w-full justify-center" />
           </div>
           <div className="mt-3">
-            <SellerPhoneReveal usedBikeId={bike.id} loggedIn={!!user} loginHref={loginHref} />
+            {bike.status === 'approved' ? (
+              <SellerPhoneReveal usedBikeId={bike.id} loggedIn={!!user} loginHref={loginHref} />
+            ) : (
+              <div className="rounded-xl border border-line bg-surface px-3 py-2.5 text-[12px] text-ink-mute">
+                Seller phone details become available to signed-in buyers after this listing is approved.
+              </div>
+            )}
           </div>
 
           {dealer && (
