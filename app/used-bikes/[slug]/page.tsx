@@ -246,11 +246,11 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
                 <div key={type} className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2">
                   <span className="text-[12.5px] font-medium">{titleCase(type)}</span>
                   <span
-                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold ${passed ? 'bg-accent-soft text-accent-dark' : 'bg-white text-ink-mute'}`}
+                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold ${passed ? 'bg-accent-soft text-accent-dark' : 'bg-danger-soft text-danger'}`}
                     title={status}
                     aria-label={`${titleCase(type)}: ${status}`}
                   >
-                    {passed ? '✓' : '—'}
+                    {passed ? '✓' : '×'}
                   </span>
                 </div>
               );

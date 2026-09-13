@@ -6,12 +6,16 @@ import Link from 'next/link';
 export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState('');
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setBusy(true); setError(null); setFields({});
+    setBusy(true); setError(null); setNotice(null); setFields({});
     const fd = new FormData(e.currentTarget);
     const payload = Object.fromEntries(fd.entries());
     try {
@@ -20,6 +24,11 @@ export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next?: st
       });
       const json = await res.json();
       if (!json.ok) { setError(json.error || 'Something went wrong'); setFields(json.fields || {}); return; }
+      if (mode === 'register' && json.data?.needs_email_verification) {
+        setVerificationEmail(json.data.email || String(payload.email));
+        setNotice(json.message || 'We sent a verification code to your email.');
+        return;
+      }
       router.push(next || json.data?.redirect || '/account');
       router.refresh();
     } catch {
@@ -29,11 +38,82 @@ export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next?: st
     }
   }
 
+  async function verifyEmail(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!verificationEmail) return;
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      const res = await fetch('/api/auth/verify-email', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: verificationEmail, code: verificationCode }),
+      });
+      const json = await res.json();
+      if (!json.ok) { setError(json.error || 'Could not confirm email'); return; }
+      router.push(next || json.data?.redirect || '/account');
+      router.refresh();
+    } catch {
+      setError('Network error. Please check your connection and try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendCode() {
+    if (!verificationEmail) return;
+    setResendBusy(true); setError(null); setNotice(null);
+    try {
+      const res = await fetch('/api/auth/resend-email-otp', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: verificationEmail }),
+      });
+      const json = await res.json();
+      if (!json.ok) { setError(json.error || 'Could not resend the code'); return; }
+      setNotice(json.message || 'A new verification code was sent.');
+      setVerificationCode('');
+    } catch {
+      setError('Network error. Please check your connection and try again.');
+    } finally {
+      setResendBusy(false);
+    }
+  }
+
   const label = 'block text-[12px] font-semibold text-ink-mute';
+
+  if (verificationEmail) {
+    return (
+      <div className="space-y-4">
+        {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-800">{error}</div>}
+        {notice && <div className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-[13px] text-brand-900">{notice}</div>}
+        <div>
+          <h2 className="text-lg font-semibold">Confirm your email</h2>
+          <p className="mt-1 text-[13px] leading-5 text-ink-mute">Enter the 6-digit code sent to <strong className="text-ink">{verificationEmail}</strong>. The code is valid for 10 minutes.</p>
+        </div>
+        <form onSubmit={verifyEmail} className="space-y-3" noValidate>
+          <div>
+            <label className={label} htmlFor="email-code">Email verification code</label>
+            <input id="email-code" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="field mt-1 text-center text-lg tracking-[0.35em]" placeholder="000000" required />
+          </div>
+          <button className="btn-primary w-full" disabled={busy || verificationCode.length !== 6}>
+            {busy ? 'Checking…' : 'Confirm email and continue'}
+          </button>
+        </form>
+        <div className="flex flex-wrap justify-center gap-3 text-[12.5px]">
+          <button type="button" onClick={resendCode} disabled={resendBusy} className="font-semibold text-brand-700 hover:underline">
+            {resendBusy ? 'Sending…' : 'Resend code'}
+          </button>
+          <button type="button" onClick={() => { setVerificationEmail(null); setVerificationCode(''); setNotice(null); setError(null); }} className="text-ink-mute hover:underline">
+            Use another email
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={submit} className="space-y-3.5" noValidate>
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-800">{error}</div>}
+      {notice && <div className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-[13px] text-brand-900">{notice}</div>}
 
       {mode === 'register' && (
         <div>

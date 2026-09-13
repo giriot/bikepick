@@ -19,6 +19,13 @@ export async function POST(req: NextRequest) {
       return fail('Email or password is incorrect', 401);
     }
     if (user.status !== 'active') return fail('This account has been suspended. Contact support.', 403);
+    if (user.email_verified === 0) {
+      const pending = await db.get<any>(
+        "SELECT id FROM otp_codes WHERE destination = ? AND purpose = 'register_email' AND consumed = 0 AND expires_at > ? LIMIT 1",
+        [user.email, new Date().toISOString()],
+      );
+      if (pending) return fail('Confirm your email with the verification code before signing in.', 403, { email: 'Email confirmation required' });
+    }
 
     await createSession(user.id);
     await audit(user, 'auth.login', 'user', user.id);

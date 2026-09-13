@@ -389,7 +389,8 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
                     <label className="flex h-24 cursor-pointer items-center justify-center rounded-lg bg-surface text-[12px] text-ink-mute hover:bg-brand-50">
                       {uploading === angle ? 'Uploading…' : '+ Add photo'}
                       <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
-                        onChange={(e) => { const file = e.target.files?.[0]; if (file) upload(angle, file); }} />
+                        onClick={(e) => { e.currentTarget.value = ''; }}
+                        onChange={(e) => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (file) upload(angle, file); }} />
                     </label>
                   )}
                 </div>
