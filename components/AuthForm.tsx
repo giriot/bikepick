@@ -138,7 +138,7 @@ export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next?: st
           </div>
           <div>
             <label className={label} htmlFor="city">City (optional)</label>
-            <input id="city" name="city" autoComplete="address-level2" className="field mt-1" placeholder="Coimbatore" />
+            <input id="city" name="city" autoComplete="off" spellCheck={false} className="field mt-1" placeholder="Coimbatore" />
           </div>
         </div>
       )}

@@ -23,6 +23,7 @@ export function Header({ user }: { user: AppUser | null }) {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const pathname = usePathname();
+  const isRegistrationPage = pathname === '/login' || pathname === '/register' || pathname === '/dealer/register';
 
   useEffect(() => { setOpen(false); setSearchOpen(false); }, [pathname]);
 
@@ -35,7 +36,7 @@ export function Header({ user }: { user: AppUser | null }) {
     : '/login';
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <header className={`${isRegistrationPage ? 'relative' : 'sticky top-0'} z-40 border-b border-line bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80`}>
       <div className="container-xl">
         <div className="flex h-16 items-center gap-4">
           <Logo compact />

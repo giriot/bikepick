@@ -19,7 +19,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: { n
   const user = await getCurrentUser();
   if (user) redirect(searchParams.next || '/account');
   return (
-    <div className="container-xl grid min-h-[70vh] items-center gap-10 py-10 lg:grid-cols-2">
+    <div className="container-xl grid min-h-[calc(100vh-4rem)] items-start gap-10 py-10 lg:grid-cols-2">
       <div className="mx-auto w-full max-w-md lg:mx-0">
         <div className="mb-6">
           <Link href="/" className="inline-flex lg:hidden"><Logo /></Link>

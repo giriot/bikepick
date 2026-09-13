@@ -13,15 +13,9 @@ export default async function DealerLayout({ children }: { children: React.React
 
   const dealer = await db.get<any>('SELECT * FROM dealer_profiles WHERE user_id = ? AND deleted_at IS NULL', [user.id]);
 
-  // No application yet → send them to the registration form (which is inside this layout).
-  if (!dealer) {
-    return (
-      <div className="container-xl py-6">
-        <h1 className="text-2xl font-bold tracking-[-0.03em]">Dealer portal</h1>
-        <div className="mt-5">{children}</div>
-      </div>
-    );
-  }
+  // The registration page owns its full-width onboarding layout. Other dealer
+  // pages redirect to it when there is no application yet.
+  if (!dealer) return <>{children}</>;
 
   const banner = {
     pending: { tone: 'warn' as const, title: 'Verification in progress', body: 'Our team is checking your business details. You can complete your profile now; offers unlock once you are verified.' },
