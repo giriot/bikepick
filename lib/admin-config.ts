@@ -447,6 +447,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
       { name: 'business_name', label: 'Dealership' },
       { name: 'city', label: 'City' },
       { name: 'phone', label: 'Phone' },
+      { name: 'email_verified', label: 'Email verified', type: 'bool' },
       STATUS_BADGE(),
       { name: 'offer_count', label: 'Offers', type: 'number', expr: "(SELECT COUNT(*) FROM dealer_offers o WHERE o.dealer_id = t.id AND o.status='approved' AND o.deleted_at IS NULL)" },
       { name: 'lead_count', label: 'Leads', type: 'number', expr: '(SELECT COUNT(*) FROM leads l WHERE l.dealer_id = t.id)' },

@@ -450,7 +450,7 @@ async function main() {
       gstin: `33ABCDE${1000 + i}F1Z5`, address: `${12 + i}, Trunk Road, ${d.city}`,
       city: d.city, state: d.state, pincode: d.pin, brands: JSON.stringify(d.brands),
       about: `Demo dealer profile created by the seed script for workflow testing.`,
-      status: 'verified', verified_at: nowIso(), verified_by: adminId,
+      status: 'verified', email_verified: 1, verified_at: nowIso(), verified_by: adminId,
       plan_id: planIds[d.plan], featured: d.plan === 'PREMIUM' ? 1 : 0, is_demo: 1,
     });
     dealerIds.push(dealerId);

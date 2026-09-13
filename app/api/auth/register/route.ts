@@ -13,16 +13,17 @@ export async function POST(req: NextRequest) {
     if (!limited.ok) return fail(`Too many attempts. Try again in ${limited.retryAfter}s.`, 429);
 
     const body = registerSchema.parse(await readJson(req));
+    if (!emailVerificationConfigured()) {
+      return fail('Email verification is not configured yet. Please try again shortly.', 503);
+    }
     const existing = await db.get<any>('SELECT id, deleted_at FROM users WHERE email = ?', [body.email]);
     if (existing && !existing.deleted_at) return fail('An account with this email already exists', 409, { email: 'Already registered' });
 
-    const requiresEmailVerification = emailVerificationConfigured();
-    if (requiresEmailVerification) {
-      const otpLimited = await rateLimit('register_email_otp', { limit: 3, windowSeconds: 600, key: body.email });
-      if (!otpLimited.ok) return fail(`Too many verification emails. Try again in ${otpLimited.retryAfter}s.`, 429);
-    }
+    const requiresEmailVerification = true;
+    const otpLimited = await rateLimit('register_email_otp', { limit: 3, windowSeconds: 600, key: body.email });
+    if (!otpLimited.ok) return fail(`Too many verification emails. Try again in ${otpLimited.retryAfter}s.`, 429);
 
-    const emailVerified = requiresEmailVerification ? 0 : 1;
+    const emailVerified = 0;
     let id: string;
     const reactivated = Boolean(existing?.deleted_at);
     if (reactivated) {

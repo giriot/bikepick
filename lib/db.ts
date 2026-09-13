@@ -193,6 +193,10 @@ const PG_RUNTIME_MIGRATIONS: { name: string; sql: string }[] = [
     name: 'rt_fix_score_weights',
     sql: `UPDATE settings SET value = '{"value":20,"features":15,"performance":15,"safety":15,"running_cost":15,"comfort":10,"maintenance":10}', updated_at = NOW()::text WHERE key = 'score_weights' AND (value LIKE '%\"price\"%' OR value LIKE '%\"efficiency\"%' OR value LIKE '%\"ownership\"%') AND value NOT LIKE '%\"running_cost\"%'`,
   },
+  {
+    name: 'rt_dealer_email_verification',
+    sql: "ALTER TABLE dealer_profiles ADD COLUMN IF NOT EXISTS email_verified INTEGER NOT NULL DEFAULT 0; UPDATE dealer_profiles SET email_verified = 1 WHERE status = 'verified'",
+  },
 ];
 
 async function applyPgRuntimeMigrations(pool: any) {

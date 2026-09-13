@@ -126,6 +126,7 @@ export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next?: st
       <div>
         <label className={label} htmlFor="email">Email</label>
         <input id="email" name="email" type="email" required autoComplete="email" className="field mt-1" placeholder="you@example.com" />
+        {mode === 'register' && <p className="mt-1 text-[11.5px] text-ink-mute">We will send a 6-digit verification code to this address.</p>}
         {fields.email && <p className="mt-1 text-[11.5px] text-rose-600">{fields.email}</p>}
       </div>
 

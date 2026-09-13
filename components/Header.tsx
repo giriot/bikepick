@@ -14,6 +14,7 @@ const NAV = [
   { href: '/ethanol', label: 'Ethanol' },
   { href: '/compare', label: 'Compare' },
   { href: '/used-bikes', label: 'Used Bikes' },
+  { href: '/used-bikes/sell', label: 'Sell Your Bike' },
   { href: '/dealer-offers', label: 'Dealer Offers' },
 ];
 
@@ -69,8 +70,6 @@ export function Header({ user }: { user: AppUser | null }) {
               </span>
             </button>
 
-            <Link href="/used-bikes/sell" className="order-2 hidden btn-accent btn-sm md:inline-flex">Sell Your Bike</Link>
-
             <Link href={accountHref} className="hidden btn-outline btn-sm md:inline-flex">
               {user ? (user.full_name?.split(' ')[0] || 'Account') : 'Login'}
             </Link>
@@ -104,9 +103,8 @@ export function Header({ user }: { user: AppUser | null }) {
                 {n.label}
               </Link>
             ))}
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <Link href="/used-bikes/sell" className="btn-accent">Sell Your Bike</Link>
-              <Link href={accountHref} className="btn-outline">{user ? 'My account' : 'Login'}</Link>
+            <div className="mt-2">
+              <Link href={accountHref} className="btn-outline w-full">{user ? 'My account' : 'Login'}</Link>
             </div>
           </nav>
         </div>

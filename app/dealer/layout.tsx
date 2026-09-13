@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { DealerNav } from '@/components/DealerNav';
+import { DealerEmailVerification } from '@/components/DealerEmailVerification';
 import { Notice } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,14 @@ export default async function DealerLayout({ children }: { children: React.React
   // The registration page owns its full-width onboarding layout. Other dealer
   // pages redirect to it when there is no application yet.
   if (!dealer) return <>{children}</>;
+
+  if (dealer.email_verified !== 1) {
+    return (
+      <div className="container-xl flex min-h-[calc(100vh-4rem)] items-start justify-center py-10">
+        <DealerEmailVerification dealerId={dealer.id} email={dealer.email} />
+      </div>
+    );
+  }
 
   const banner = {
     pending: { tone: 'warn' as const, title: 'Verification in progress', body: 'Our team is checking your business details. You can complete your profile now; offers unlock once you are verified.' },

@@ -5,7 +5,7 @@ import { dealerRegisterSchema } from '@/lib/validation';
 import { handleError, ok, fail, readJson } from '@/lib/api';
 import { rateLimit } from '@/lib/ratelimit';
 import { audit } from '@/lib/audit';
-import { notify } from '@/lib/notify';
+import { emailVerificationConfigured, sendDealerEmailOtp } from '@/lib/email-otp';
 import { isOwnPrivateUploadKey } from '@/services/storage';
 
 /** Dealer applications always start as `pending` — an admin must verify them. */
@@ -24,6 +24,15 @@ export async function POST(req: NextRequest) {
         visiting_card_key: 'Upload a valid visiting card for dealership confirmation',
       });
     }
+    if (!emailVerificationConfigured()) {
+      return fail('Dealer email verification is not configured yet. Please try again shortly.', 503);
+    }
+    const otpLimited = await rateLimit('dealer_email_otp', { limit: 3, windowSeconds: 600, key: body.email });
+    if (!otpLimited.ok) return fail(`Too many verification emails. Try again in ${otpLimited.retryAfter}s.`, 429);
+    const delivery = await sendDealerEmailOtp(body.email);
+    if (!delivery.delivered) return fail('Could not send the dealer confirmation email. Please try again shortly.', 503, {
+      email: 'Confirmation email could not be sent',
+    });
 
     const id = uid('dlr');
     await db.tx(async () => {
@@ -34,7 +43,7 @@ export async function POST(req: NextRequest) {
         gstin: body.gstin || null, address: body.address, city: body.city,
         state: body.state, pincode: body.pincode,
         brands: JSON.stringify(body.brands || []), about: body.about || null,
-        status: 'pending',
+        status: 'pending', email_verified: 0,
       });
       await insert('dealer_documents', {
         id: uid('doc'), dealer_id: id, doc_type: 'visiting_card',
@@ -43,14 +52,11 @@ export async function POST(req: NextRequest) {
       });
     });
 
-    await notify({
-      userId: user.id, event: 'dealer_verified',
-      title: 'Dealer application received',
-      body: 'We will verify your business details and documents, usually within two working days.',
-      link: '/dealer', email: body.email, phone: body.phone,
-    });
     await audit(user, 'dealer.apply', 'dealer_profile', id);
-    return ok({ id, status: 'pending' }, 'Application submitted for verification');
+    return ok(
+      { id, status: 'pending', email: body.email, needs_email_verification: true },
+      'Application saved. We sent a verification code to the dealer email.',
+    );
   } catch (e) {
     return handleError(e);
   }

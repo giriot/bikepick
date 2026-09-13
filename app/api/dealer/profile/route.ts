@@ -22,15 +22,16 @@ const schema = z.object({
 export async function PATCH(req: NextRequest) {
   try {
     const user = await requireUser();
-    const dealer = await db.get<any>('SELECT id FROM dealer_profiles WHERE user_id = ? AND deleted_at IS NULL', [user.id]);
+    const dealer = await db.get<any>('SELECT id, email, email_verified FROM dealer_profiles WHERE user_id = ? AND deleted_at IS NULL', [user.id]);
     if (!dealer) return fail('No dealer profile', 404);
 
     const b = schema.parse(await readJson(req));
     await db.run(
-      `UPDATE dealer_profiles SET dealer_name=?, phone=?, email=?, whatsapp=?, address=?, city=?, state=?, pincode=?, about=?, brands=?, updated_at=?
+      `UPDATE dealer_profiles SET dealer_name=?, phone=?, email=?, whatsapp=?, address=?, city=?, state=?, pincode=?, about=?, brands=?,
+        email_verified = CASE WHEN ? = ? THEN email_verified ELSE 0 END, updated_at=?
         WHERE id = ?`,
       [b.dealer_name, b.phone, b.email, b.whatsapp || null, b.address, b.city, b.state, b.pincode,
-       b.about || null, JSON.stringify(b.brands || []), nowIso(), dealer.id],
+       b.about || null, JSON.stringify(b.brands || []), b.email, dealer.email, nowIso(), dealer.id],
     );
     await audit(user, 'dealer.update_profile', 'dealer_profile', dealer.id);
     return ok({ id: dealer.id }, 'Profile updated');

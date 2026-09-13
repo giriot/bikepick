@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { DealerEmailVerification } from './DealerEmailVerification';
 
 const MAX_VISITING_CARD_BYTES = 4 * 1024 * 1024;
 
@@ -25,6 +26,7 @@ export function DealerRegisterForm({ brands, defaults }: {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string[]>([]);
   const [visitingCardName, setVisitingCardName] = useState('');
+  const [dealerVerification, setDealerVerification] = useState<{ id: string; email: string } | null>(null);
 
   const fieldClass = (name: string) => fields[name]
     ? 'field !border-rose-400 !bg-rose-50/40 focus:!border-rose-500'
@@ -97,6 +99,12 @@ export function DealerRegisterForm({ brands, defaults }: {
         return;
       }
 
+      if (json.data?.needs_email_verification && json.data?.id && json.data?.email) {
+        setDealerVerification({ id: json.data.id, email: json.data.email });
+        setBusy(false);
+        return;
+      }
+
       router.push('/dealer');
       router.refresh();
     } catch (err) {
@@ -106,6 +114,10 @@ export function DealerRegisterForm({ brands, defaults }: {
       setError(message);
       setBusy(false);
     }
+  }
+
+  if (dealerVerification) {
+    return <DealerEmailVerification dealerId={dealerVerification.id} email={dealerVerification.email} />;
   }
 
   return (
@@ -125,7 +137,9 @@ export function DealerRegisterForm({ brands, defaults }: {
           <div><Label htmlFor="whatsapp" optional>WhatsApp</Label>
             <input id="whatsapp" name="whatsapp" inputMode="numeric" className={fieldClass('whatsapp')} /><Err name="whatsapp" /></div>
           <div><Label htmlFor="email">Business email</Label>
-            <input id="email" name="email" type="email" required defaultValue={defaults.email} className={fieldClass('email')} /><Err name="email" /></div>
+            <input id="email" name="email" type="email" required defaultValue={defaults.email} className={fieldClass('email')} />
+            <p className="mt-1 text-[11.5px] text-ink-mute">A 6-digit OTP will be sent here after you submit the application.</p>
+            <Err name="email" /></div>
           <div><Label htmlFor="gstin" optional>GSTIN</Label>
             <input id="gstin" name="gstin" className={fieldClass('gstin')} placeholder="22AAAAA0000A1Z5" /><Err name="gstin" />
             <p className="mt-1 text-[11.5px] text-ink-mute">Speeds up verification considerably.</p></div>

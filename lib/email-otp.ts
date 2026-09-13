@@ -3,8 +3,11 @@ import { db, insert, nowIso, uid } from './db';
 import { emailService, type DeliveryResult } from '@/services/email';
 
 export const EMAIL_OTP_PURPOSE = 'register_email';
+export const DEALER_EMAIL_OTP_PURPOSE = 'dealer_register_email';
 const OTP_TTL_MINUTES = 10;
 const MAX_ATTEMPTS = 5;
+
+type OtpResult = { ok: true } | { ok: false; error: string };
 
 function hashCode(code: string): string {
   return crypto.createHash('sha256').update(code).digest('hex');
@@ -20,12 +23,12 @@ export function emailVerificationConfigured(): boolean {
   return emailService.configured();
 }
 
-export async function sendEmailOtp(email: string): Promise<DeliveryResult> {
+async function sendOtp(email: string, purpose: string, subject: string, description: string): Promise<DeliveryResult> {
   const destination = email.trim().toLowerCase();
   const now = nowIso();
   await db.run(
     'UPDATE otp_codes SET consumed = 1, updated_at = ? WHERE destination = ? AND purpose = ? AND consumed = 0',
-    [now, destination, EMAIL_OTP_PURPOSE],
+    [now, destination, purpose],
   );
 
   const code = String(crypto.randomInt(100000, 1000000));
@@ -33,7 +36,7 @@ export async function sendEmailOtp(email: string): Promise<DeliveryResult> {
   const id = uid('otp');
   await insert('otp_codes', {
     id,
-    purpose: EMAIL_OTP_PURPOSE,
+    purpose,
     destination,
     code_hash: hashCode(code),
     consumed: 0,
@@ -43,8 +46,8 @@ export async function sendEmailOtp(email: string): Promise<DeliveryResult> {
 
   const delivery = await emailService.send({
     to: destination,
-    subject: 'Confirm your Bikepick.IN account',
-    text: `Your Bikepick.IN email verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes. If you did not create this account, ignore this email.`,
+    subject,
+    text: `Your ${description} verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes. If you did not request this, ignore this email.`,
   });
   if (!delivery.delivered) {
     await db.run('UPDATE otp_codes SET consumed = 1, updated_at = ? WHERE id = ?', [nowIso(), id]);
@@ -52,13 +55,21 @@ export async function sendEmailOtp(email: string): Promise<DeliveryResult> {
   return delivery;
 }
 
-export async function verifyEmailOtp(email: string, code: string): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
+export function sendEmailOtp(email: string): Promise<DeliveryResult> {
+  return sendOtp(email, EMAIL_OTP_PURPOSE, 'Confirm your Bikepick.IN account', 'Bikepick.IN email');
+}
+
+export function sendDealerEmailOtp(email: string): Promise<DeliveryResult> {
+  return sendOtp(email, DEALER_EMAIL_OTP_PURPOSE, 'Confirm your Bikepick.IN dealer email', 'Bikepick.IN dealer email');
+}
+
+async function verifyOtpCode(email: string, code: string, purpose: string): Promise<OtpResult> {
   const destination = email.trim().toLowerCase();
   const row = await db.get<any>(
     `SELECT * FROM otp_codes
       WHERE destination = ? AND purpose = ? AND consumed = 0
       ORDER BY created_at DESC LIMIT 1`,
-    [destination, EMAIL_OTP_PURPOSE],
+    [destination, purpose],
   );
   if (!row) return { ok: false, error: 'That code has expired. Request a new code.' };
   if (new Date(row.expires_at).getTime() < Date.now()) {
@@ -75,10 +86,22 @@ export async function verifyEmailOtp(email: string, code: string): Promise<{ ok:
     return { ok: false, error: 'The verification code is incorrect.' };
   }
 
+  await db.run('UPDATE otp_codes SET consumed = 1, updated_at = ? WHERE id = ?', [nowIso(), row.id]);
+  return { ok: true };
+}
+
+export async function verifyEmailOtp(email: string, code: string): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
+  const result = await verifyOtpCode(email, code, EMAIL_OTP_PURPOSE);
+  if (!result.ok) return result;
+
+  const destination = email.trim().toLowerCase();
   const user = await db.get<any>('SELECT id FROM users WHERE email = ? AND deleted_at IS NULL', [destination]);
   if (!user) return { ok: false, error: 'Account not found. Please register again.' };
 
-  await db.run('UPDATE otp_codes SET consumed = 1, updated_at = ? WHERE id = ?', [nowIso(), row.id]);
   await db.run('UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?', [nowIso(), user.id]);
   return { ok: true, userId: user.id };
+}
+
+export async function verifyDealerEmailOtp(email: string, code: string): Promise<OtpResult> {
+  return verifyOtpCode(email, code, DEALER_EMAIL_OTP_PURPOSE);
 }
