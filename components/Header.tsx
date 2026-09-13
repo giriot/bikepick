@@ -63,10 +63,10 @@ export function Header({ user }: { user: AppUser | null }) {
               aria-expanded={searchOpen}
               className="order-first grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-brand-200 bg-brand-50 text-brand-600 hover:border-brand-400 hover:bg-brand-100"
             >
-              <svg className="block shrink-0" width="23" height="23" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="10.8" cy="10.8" r="6.8" stroke="#C2410C" strokeWidth="2.5" />
-                <path d="m16 16 4.4 4.4" stroke="#C2410C" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
+              <span className="relative block h-6 w-6 shrink-0" aria-hidden="true">
+                <span className="absolute left-0.5 top-0.5 h-[17px] w-[17px] rounded-full border-[3px] border-brand-600" />
+                <span className="absolute bottom-0 right-0 h-3 w-[3px] origin-top rotate-[-45deg] rounded-full bg-brand-600" />
+              </span>
             </button>
 
             <Link href="/used-bikes/sell" className="order-2 hidden btn-accent btn-sm md:inline-flex">Sell Your Bike</Link>

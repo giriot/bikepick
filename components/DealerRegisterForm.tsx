@@ -4,6 +4,17 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const MAX_VISITING_CARD_BYTES = 4 * 1024 * 1024;
+
+async function responseJson(response: Response): Promise<any> {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: false, error: `Request failed (${response.status || 'no response'})` };
+  }
+}
+
 export function DealerRegisterForm({ brands, defaults }: {
   brands: { id: string; name: string }[];
   defaults: { name: string; phone: string; email: string; city: string };
@@ -43,13 +54,21 @@ export function DealerRegisterForm({ brands, defaults }: {
       setBusy(false);
       return;
     }
+    if (visitingCard.size > MAX_VISITING_CARD_BYTES) {
+      setError('The visiting card is too large. Please choose a file up to 4 MB.');
+      setFields({ visiting_card: 'Maximum file size is 4 MB.' });
+      setBusy(false);
+      return;
+    }
 
     try {
       const upload = new FormData();
       upload.append('file', visitingCard);
       upload.append('purpose', 'dealer_document');
-      const uploadRes = await fetch('/api/uploads', { method: 'POST', body: upload });
-      const uploadJson = await uploadRes.json();
+      const uploadRes = await fetch('/api/uploads', {
+        method: 'POST', body: upload, credentials: 'same-origin', cache: 'no-store',
+      });
+      const uploadJson = await responseJson(uploadRes);
       if (!uploadRes.ok || !uploadJson.ok || !uploadJson.data?.key) {
         setError(uploadJson.error || 'Could not upload the visiting card.');
         setFields({ visiting_card: uploadJson.error || 'Upload the visiting card again.' });
@@ -65,8 +84,10 @@ export function DealerRegisterForm({ brands, defaults }: {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ ...payload, brands: selected }),
+        credentials: 'same-origin',
+        cache: 'no-store',
       });
-      const json = await res.json();
+      const json = await responseJson(res);
       if (!res.ok || !json.ok) {
         const nextFields: Record<string, string> = { ...(json.fields || {}) };
         if (nextFields.visiting_card_key) nextFields.visiting_card = nextFields.visiting_card_key;
@@ -79,7 +100,10 @@ export function DealerRegisterForm({ brands, defaults }: {
       router.push('/dealer');
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not submit the dealership application.');
+      const message = err instanceof TypeError && /fetch/i.test(err.message)
+        ? 'Could not reach the upload service. Check your connection, refresh the page, and try again.'
+        : err instanceof Error ? err.message : 'Could not submit the dealership application.';
+      setError(message);
       setBusy(false);
     }
   }
@@ -142,7 +166,7 @@ export function DealerRegisterForm({ brands, defaults }: {
           aria-describedby="visiting_card_help" className={`${fieldClass('visiting_card')} py-2`}
           onChange={(event) => setVisitingCardName(event.target.files?.[0]?.name || '')} />
         {visitingCardName && <p className="mt-1 text-[12px] text-emerald-700">Selected: {visitingCardName}</p>}
-        <p id="visiting_card_help" className="mt-1 text-[11.5px] leading-4 text-ink-mute">Required for confirmation. PDF or image, maximum 10 MB. Stored privately for verification.</p>
+        <p id="visiting_card_help" className="mt-1 text-[11.5px] leading-4 text-ink-mute">Required for confirmation. PDF or image, maximum 4 MB. Stored privately for verification.</p>
         <Err name="visiting_card" />
 
         <label className="mt-4 flex items-start gap-2 text-[12.5px] leading-5 text-ink-soft">
