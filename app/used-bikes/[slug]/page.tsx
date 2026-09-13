@@ -10,6 +10,7 @@ import { getJsonSetting } from '@/lib/settings';
 import { buildMetadata, breadcrumbJsonLd, JsonLd } from '@/lib/seo';
 import { Breadcrumbs, Notice, SectionHeader, TrustBadge } from '@/components/ui';
 import { LeadDialog } from '@/components/LeadDialog';
+import { SellerPhoneReveal } from '@/components/SellerPhoneReveal';
 import { SaveButton } from '@/components/SaveButton';
 import { AdSlot } from '@/components/AdSlot';
 
@@ -183,6 +184,9 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
               defaults={{ name: user?.full_name || '', phone: user?.phone || '', city: user?.city || '' }}
             />
             <SaveButton usedBikeId={bike.id} initialSaved={isSaved} className="btn-outline w-full justify-center" />
+          </div>
+          <div className="mt-3">
+            <SellerPhoneReveal usedBikeId={bike.id} />
           </div>
 
           {dealer && (
