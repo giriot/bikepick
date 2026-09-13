@@ -204,25 +204,18 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
             {['seller_identity', 'ownership_declaration', 'rc_verification', 'insurance_verification', 'puc_verification', 'loan_status', 'service_history', 'physical_inspection'].map((type) => {
               const rec = checks.find((c: any) => c.check_type === type);
               const passed = rec?.result === 'passed';
-              const status = rec ? titleCase(rec.result) : 'Not checked';
+              const status = passed ? 'Verified' : 'Not verified';
               const label = titleCase(type);
               return (
                 <div key={type} className="flex min-h-9 items-center justify-between gap-2 bg-white px-3 py-1.5" role="listitem">
                   <span className="text-[12px] font-medium leading-4">{label}</span>
                   <span
-                    className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${passed ? 'bg-accent-soft text-accent-dark' : 'bg-danger-soft text-danger'}`}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${passed ? 'bg-accent-soft text-accent-dark' : 'bg-danger-soft text-danger'}`}
                     title={status}
                     aria-label={`${label}: ${status}`}
                   >
-                    {passed ? (
-                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                        <path d="m3 8.5 3.1 3.1L13 4.8" stroke="#00875C" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    ) : (
-                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                        <path d="m4.2 4.2 7.6 7.6M11.8 4.2l-7.6 7.6" stroke="#E11D48" strokeWidth="2.3" strokeLinecap="round" />
-                      </svg>
-                    )}
+                    <span className="text-[16px] font-black leading-none" aria-hidden="true">{passed ? '✓' : '×'}</span>
+                    <span>{status}</span>
                   </span>
                 </div>
               );
