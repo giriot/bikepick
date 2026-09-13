@@ -26,7 +26,7 @@ export const gstinSchema = z
 export const registerSchema = z.object({
   full_name: z.string().trim().min(2).max(80),
   email: emailSchema,
-  phone: phoneSchema.optional().or(z.literal('')),
+  phone: phoneSchema,
   password: z.string().min(8, 'Password must be at least 8 characters').max(200),
   city: z.string().trim().max(60).optional().or(z.literal('')),
 });
@@ -113,6 +113,9 @@ export const usedBikeSchema = z.object({
   battery_condition: z.enum(['new', 'good', 'average', 'replace_soon', 'na']).optional(),
   abs_equipped: z.coerce.boolean().optional(),
   description: z.string().trim().max(2000).optional().or(z.literal('')),
+  // Collected in the seller wizard so an existing account can complete its
+  // registered contact number before submitting a listing.
+  seller_phone: phoneSchema.optional().or(z.literal('')),
   images: z
     .array(z.object({ angle: z.string(), image_url: z.string().min(1) }))
     .default([])

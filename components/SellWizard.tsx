@@ -42,6 +42,7 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
   const [photos, setPhotos] = useState<Record<string, Photo>>({});
   const [uploading, setUploading] = useState<string | null>(null);
   const [valuation, setValuation] = useState<any>(null);
+  const [sellerPhone, setSellerPhone] = useState(defaults.phone || '');
 
   const [f, setF] = useState<Record<string, string>>({
     brand_name: '', model_name: '', product_id: '', variant_name: '',
@@ -55,6 +56,7 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
 
   const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }));
   const models = useMemo(() => brands.find((b) => b.name === f.brand_name)?.models || [], [brands, f.brand_name]);
+  const normalizedSellerPhone = sellerPhone.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
 
   const uploadedRequired = REQUIRED_ANGLES.filter(([a]) => photos[a]).length;
 
@@ -65,7 +67,7 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
       if (!f.manufacture_year) return 'Enter the manufacture year';
       if (!f.km_driven) return 'Enter kilometres driven';
       if (!f.city) return 'Enter your city';
-      if (!defaults.phone) return 'Add your mobile number in Account → Profile before listing your bike';
+      if (!/^[6-9]\d{9}$/.test(normalizedSellerPhone)) return 'Enter a valid 10-digit mobile number for buyer contact';
       return null;
     }
     if (i === 3) {
@@ -137,6 +139,7 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         ...f,
+        seller_phone: normalizedSellerPhone,
         manufacture_year: Number(f.manufacture_year),
         registration_year: f.registration_year ? Number(f.registration_year) : undefined,
         km_driven: Number(f.km_driven), owners: Number(f.owners), asking_price: Number(f.asking_price),
@@ -254,22 +257,24 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
                 <div>
                   <p className="text-[13.5px] font-semibold text-brand-900">Owner details</p>
                   <p className="mt-0.5 text-[12px] leading-5 text-brand-800/80">
-                    Buyers never see your private contact details. We use them to verify ownership and send listing updates.
+                    Your number is stored on your registered account. On an approved listing, buyers can request it by clicking “Show seller phone number”; documents remain private.
                   </p>
                 </div>
                 <Link href="/account/profile" className="btn-outline btn-sm bg-white">Update profile</Link>
               </div>
               <dl className="mt-3 grid gap-2 sm:grid-cols-3">
-                {[
-                  ['Name', defaults.name || 'Add your name'],
-                  ['Email', defaults.email || 'Missing'],
-                  ['Mobile', defaults.phone || 'Add a mobile number'],
-                ].map(([label, value]) => (
-                  <div key={label} className="min-w-0 rounded-lg border border-brand-200 bg-white px-3 py-2">
-                    <dt className="text-[10.5px] uppercase tracking-wide text-ink-mute">{label}</dt>
-                    <dd className="mt-0.5 truncate text-[12.5px] font-semibold text-ink" title={value}>{value}</dd>
-                  </div>
-                ))}
+                <div className="min-w-0 rounded-lg border border-brand-200 bg-white px-3 py-2">
+                  <dt className="text-[10.5px] uppercase tracking-wide text-ink-mute">Name</dt>
+                  <dd className="mt-0.5 truncate text-[12.5px] font-semibold text-ink" title={defaults.name || 'Missing'}>{defaults.name || 'Missing'}</dd>
+                </div>
+                <div className="min-w-0 rounded-lg border border-brand-200 bg-white px-3 py-2">
+                  <dt className="text-[10.5px] uppercase tracking-wide text-ink-mute">Email</dt>
+                  <dd className="mt-0.5 truncate text-[12.5px] font-semibold text-ink" title={defaults.email || 'Missing'}>{defaults.email || 'Missing'}</dd>
+                </div>
+                <div className="min-w-0 rounded-lg border border-brand-200 bg-white px-3 py-2">
+                  <label className="text-[10.5px] uppercase tracking-wide text-ink-mute" htmlFor="seller-phone">Mobile number <span className="text-danger">*</span></label>
+                  <input id="seller-phone" value={sellerPhone} onChange={(e) => setSellerPhone(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="10-digit mobile" className="field mt-1 !py-1.5 text-[12.5px]" />
+                </div>
               </dl>
             </div>
           </div>

@@ -19,13 +19,14 @@ import { notify } from '@/lib/notify';
 export async function POST(req: NextRequest) {
   try {
     const user = await requireUser();
-    if (!user.full_name || !user.email || !user.phone) {
-      return fail('Complete your name, email and mobile number in Account → Profile before listing a bike', 422);
-    }
     const limited = await rateLimit('used_bike_submit', { limit: 5, windowSeconds: 3600, key: user.id });
     if (!limited.ok) return fail('You have submitted several listings recently. Please try again later.', 429);
 
     const body = usedBikeSchema.parse(await readJson(req));
+    const ownerPhone = body.seller_phone || user.phone;
+    if (!user.full_name || !user.email || !ownerPhone) {
+      return fail('Enter your full name, email and mobile number before listing a bike', 422);
+    }
     const minPhotos = Math.max(Number((await getSetting('used_bike_min_photos')) || 5), REQUIRED_ANGLES.length);
     if (body.images.length < minPhotos) return fail(`At least ${minPhotos} photos are required`, 422);
 
@@ -37,6 +38,13 @@ export async function POST(req: NextRequest) {
       if (!isOwnStagedKey(image.image_url, user.id)) {
         return fail('Photos must be uploaded through this form. Please re-upload your photos.', 422);
       }
+    }
+
+    // A seller can complete or correct the registered mobile number directly
+    // in this wizard. It is stored on the authenticated account and reused for
+    // buyer enquiries and lifecycle notifications.
+    if (ownerPhone !== user.phone) {
+      await db.run('UPDATE users SET phone = ?, updated_at = ? WHERE id = ?', [ownerPhone, nowIso(), user.id]);
     }
 
     // Match to a catalogue product where possible (helps search and valuation).
@@ -120,7 +128,7 @@ export async function POST(req: NextRequest) {
       userId: user.id, event: 'used_bike_submitted',
       title: 'Used-bike listing received',
       body: 'We will verify your identity, documents and photos before your listing goes public.',
-      link: '/account/listings', email: user.email, phone: user.phone,
+      link: '/account/listings', email: user.email, phone: ownerPhone,
     });
     await audit(user, 'used_bike.submit', 'used_bike', id);
     await track('used_bike_submitted', { entity_type: 'used_bike', entity_id: id, user_id: user.id });

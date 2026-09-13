@@ -52,8 +52,8 @@ export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next?: st
       {mode === 'register' && (
         <div className="grid gap-3.5 sm:grid-cols-2">
           <div>
-            <label className={label} htmlFor="phone">Phone (optional)</label>
-            <input id="phone" name="phone" inputMode="numeric" autoComplete="tel" className="field mt-1" placeholder="10-digit mobile" />
+            <label className={label} htmlFor="phone">Phone <span className="text-danger">*</span></label>
+            <input id="phone" name="phone" required inputMode="numeric" autoComplete="tel" className="field mt-1" placeholder="10-digit mobile" />
             {fields.phone && <p className="mt-1 text-[11.5px] text-rose-600">{fields.phone}</p>}
           </div>
           <div>

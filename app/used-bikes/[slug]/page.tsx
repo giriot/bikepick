@@ -200,11 +200,11 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
       </div>
 
       {/* ------------------------- TRUST BREAKDOWN ------------------------- */}
-      <section className="mt-12">
+      <section className="mt-8">
         <SectionHeader title={`Trust score: ${trust.score}/100 — ${trust.label}`} subtitle="Points are awarded only for checks that were actually completed and recorded." />
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-2 md:grid-cols-2">
           {trust.factors.map((f) => (
-            <div key={f.key} className="card flex items-start gap-3 p-4">
+            <div key={f.key} className="card flex items-start gap-2.5 p-3">
               <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold ${f.state === 'done' ? 'bg-accent-soft text-accent-dark' : f.state === 'partial' ? 'bg-warn-soft text-[#8A5B00]' : 'bg-surface text-ink-mute'}`} aria-hidden="true">
                 {f.state === 'done' ? '✓' : f.state === 'partial' ? '~' : '–'}
               </span>
@@ -235,29 +235,26 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
           </div>
         )}
 
-        <div className="card mt-4 overflow-x-auto">
-          <table className="w-full text-left text-[13px]">
-            <thead className="bg-surface text-[11px] uppercase tracking-wide text-ink-mute">
-              <tr><th className="px-4 py-2.5">Check</th><th className="px-4 py-2.5">Result</th><th className="px-4 py-2.5">Method</th><th className="px-4 py-2.5">Date</th></tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {['seller_identity', 'ownership_declaration', 'rc_verification', 'insurance_verification', 'puc_verification', 'loan_status', 'service_history', 'physical_inspection'].map((type) => {
-                const rec = checks.find((c: any) => c.check_type === type);
-                return (
-                  <tr key={type}>
-                    <td className="px-4 py-2.5 font-medium">{titleCase(type)}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`badge ${rec?.result === 'passed' ? 'bg-accent-soft text-accent-dark' : rec?.result === 'failed' ? 'bg-danger-soft text-danger' : 'bg-surface text-ink-mute'}`}>
-                        {rec ? titleCase(rec.result) : 'Not checked'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-ink-mute">{rec?.method ? titleCase(rec.method) : '—'}</td>
-                    <td className="px-4 py-2.5 text-ink-mute">{rec?.performed_at ? dateIn(rec.performed_at) : '—'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="card mt-4 p-3 sm:p-4">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {['seller_identity', 'ownership_declaration', 'rc_verification', 'insurance_verification', 'puc_verification', 'loan_status', 'service_history', 'physical_inspection'].map((type) => {
+              const rec = checks.find((c: any) => c.check_type === type);
+              const passed = rec?.result === 'passed';
+              const status = rec ? titleCase(rec.result) : 'Not checked';
+              return (
+                <div key={type} className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2">
+                  <span className="text-[12.5px] font-medium">{titleCase(type)}</span>
+                  <span
+                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold ${passed ? 'bg-accent-soft text-accent-dark' : 'bg-white text-ink-mute'}`}
+                    title={status}
+                    aria-label={`${titleCase(type)}: ${status}`}
+                  >
+                    {passed ? '✓' : '—'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
