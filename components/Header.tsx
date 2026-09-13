@@ -61,15 +61,15 @@ export function Header({ user }: { user: AppUser | null }) {
               onClick={() => setSearchOpen((s) => !s)}
               aria-label="Search"
               aria-expanded={searchOpen}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-brand-200 bg-brand-50 text-brand-600 hover:border-brand-400 hover:bg-brand-100"
+              className="order-first grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-brand-200 bg-brand-50 text-brand-600 hover:border-brand-400 hover:bg-brand-100"
             >
-              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" strokeWidth="2.5" />
-                <path d="m16 16 4.4 4.4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+              <svg className="block shrink-0" width="23" height="23" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="10.8" cy="10.8" r="6.8" stroke="#C2410C" strokeWidth="2.5" />
+                <path d="m16 16 4.4 4.4" stroke="#C2410C" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </button>
 
-            <Link href="/used-bikes/sell" className="hidden btn-accent btn-sm md:inline-flex">Sell Your Bike</Link>
+            <Link href="/used-bikes/sell" className="order-2 hidden btn-accent btn-sm md:inline-flex">Sell Your Bike</Link>
 
             <Link href={accountHref} className="hidden btn-outline btn-sm md:inline-flex">
               {user ? (user.full_name?.split(' ')[0] || 'Account') : 'Login'}
