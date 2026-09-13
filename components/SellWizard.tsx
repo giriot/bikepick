@@ -79,6 +79,7 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
       if (!/^[6-9]\d{9}$/.test(normalizedSellerPhone)) return 'Enter a valid 10-digit mobile number for buyer contact';
       return null;
     }
+    if (i === 1 && f.description.trim().length < 40) return 'Add a detailed description of at least 40 characters';
     if (i === 2) {
       if (documentUploading) return 'Wait for the document upload to finish';
       if (!documents.identity || !documents.rc) return 'Upload your ID card and RC before continuing';
@@ -215,9 +216,8 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
         <h2 className="mt-4 text-xl font-semibold">Listing submitted for verification</h2>
         <p className="mx-auto mt-2 max-w-lg text-[13.5px] leading-6 text-ink-mute">
           Status: <strong className="text-ink">{done.status.replace(/_/g, ' ')}</strong>. Our team will verify your
-          identity and documents before the listing becomes public. Use “Track my listing” to upload your RC, insurance and
-          identity card, Loan / NOC, service history or other documents if you have not already done so. You will be notified
-          of the outcome — including if we need more information.
+          identity and documents before the listing becomes public. Use “Track my listing” to view the status and any note
+          from our verification team. You will be notified of the outcome — including if we need more information.
         </p>
         <div className="mt-5 flex justify-center gap-2">
           <Link href="/account/listings" className="btn-primary">Track my listing</Link>
@@ -355,8 +355,8 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
               </select>
             </Field>
             <div className="sm:col-span-2">
-              <Field label="Description" hint="Be honest about faults — undisclosed issues are the main reason listings get rejected.">
-                <textarea value={f.description} onChange={(e) => set('description', e.target.value)} rows={4} maxLength={2000} className="field" placeholder="Single owner, garage parked, new tyres at 22,000 km, minor scratch on left panel." />
+              <Field label="Detailed description" required hint="At least 40 characters. Mention ownership, servicing, faults, accident history and notable wear honestly.">
+                <textarea value={f.description} onChange={(e) => set('description', e.target.value)} rows={5} minLength={40} maxLength={2000} required className="field" placeholder="Single owner, regularly serviced, garage parked. New rear tyre at 22,000 km; small scratch on the left panel; no engine or structural issue." />
               </Field>
             </div>
           </div>
@@ -388,7 +388,7 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
                 <p className="mt-1 text-[12px] leading-5 text-brand-900/80">
                   Add each document on its own line. RC and ID card are required before continuing; insurance, Loan / NOC,
                   service history and other evidence can be added when relevant. Files are private and never shown to buyers.
-                  Missing optional documents can still be supplied later from My listings.
+                  If an optional document is not relevant, leave that row empty.
                 </p>
               </div>
               <div className="mt-4 divide-y divide-brand-200 border-y border-brand-200">

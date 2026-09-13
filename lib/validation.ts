@@ -112,7 +112,7 @@ export const usedBikeSchema = z.object({
   tyre_condition: z.enum(['new', 'good', 'average', 'replace_soon']),
   battery_condition: z.enum(['new', 'good', 'average', 'replace_soon', 'na']).optional(),
   abs_equipped: z.coerce.boolean().optional(),
-  description: z.string().trim().max(2000).optional().or(z.literal('')),
+  description: z.string().trim().min(40, 'Add a detailed description of at least 40 characters').max(2000),
   // Collected in the seller wizard so an existing account can complete its
   // registered contact number before submitting a listing.
   seller_phone: phoneSchema.optional().or(z.literal('')),

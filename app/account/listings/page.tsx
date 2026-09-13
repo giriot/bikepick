@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { inr, relative } from '@/lib/format';
 import { Empty, Notice, TrustBadge } from '@/components/ui';
-import { UsedBikeDocumentUpload } from '@/components/UsedBikeDocumentUpload';
+import { DeleteUsedBikeButton } from '@/components/DeleteUsedBikeButton';
 import { buildMetadata } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
@@ -29,14 +29,6 @@ export default async function MyListings() {
        FROM used_bikes u WHERE u.seller_id = ? AND u.deleted_at IS NULL ORDER BY u.created_at DESC`,
     [user.id],
   );
-  const documents = new Map<string, any[]>();
-  await Promise.all(rows.map(async (listing) => {
-    documents.set(listing.id, await db.all<any>(
-      'SELECT id, doc_type, status, note, created_at FROM used_bike_documents WHERE used_bike_id = ? ORDER BY created_at DESC',
-      [listing.id],
-    ));
-  }));
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -75,17 +67,14 @@ export default async function MyListings() {
                 <div className="mt-2"><Notice tone={l.status === 'rejected' ? 'danger' : 'warn'} title="Note from our team">{l.rejection_reason || l.info_request}</Notice></div>
               )}
 
-              <div className="mt-5 border-t border-line pt-5">
-                <UsedBikeDocumentUpload listingId={l.id} documents={documents.get(l.id) || []} />
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap items-start gap-2">
                 <Link href={`/used-bikes/${l.slug}`} className="btn-outline btn-sm">View listing</Link>
                 {l.status === 'approved' && (
                   <form action={`/api/used-bikes/${l.id}/sold`} method="post">
                     <button className="btn-outline btn-sm">Mark as sold</button>
                   </form>
                 )}
+                <DeleteUsedBikeButton listingId={l.id} />
               </div>
             </article>
           );
