@@ -37,7 +37,12 @@ export async function POST(req: NextRequest) {
     const delivery = await sendDealerEmailOtp(email);
     if (!delivery.delivered) {
       await refundRateLimit('dealer_email_otp', user.id);
-      return fail('Could not send the confirmation email. Please try again shortly.', 503);
+      const diagnostic = [
+        delivery.responseCode ? `SMTP ${delivery.responseCode}` : '',
+        delivery.code || '',
+        delivery.command || '',
+      ].filter(Boolean).join(' / ');
+      return fail(`Could not send the confirmation email${diagnostic ? ` (${diagnostic})` : ''}. Please try again shortly.`, 503);
     }
     return ok({ email }, 'A new dealer email verification code was sent');
   } catch (e) {

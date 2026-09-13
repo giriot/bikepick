@@ -3,7 +3,16 @@
  * and registering it below — no application code changes required.
  */
 export interface EmailMessage { to: string; subject: string; text: string; html?: string }
-export interface DeliveryResult { delivered: boolean; provider: string; reason?: string; id?: string }
+export interface DeliveryResult {
+  delivered: boolean;
+  provider: string;
+  reason?: string;
+  id?: string;
+  /** Safe diagnostics; never include credentials or message contents. */
+  code?: string;
+  responseCode?: number;
+  command?: string;
+}
 
 export interface EmailProvider {
   name: string;
@@ -75,7 +84,14 @@ const smtpProvider: EmailProvider = {
         command: error.command,
         message: error.message,
       });
-      return { delivered: false, provider: 'smtp', reason: error.message || 'smtp_delivery_failed' };
+      return {
+        delivered: false,
+        provider: 'smtp',
+        reason: error.message || 'smtp_delivery_failed',
+        code: error.code,
+        responseCode: error.responseCode,
+        command: error.command,
+      };
     }
   },
 };
