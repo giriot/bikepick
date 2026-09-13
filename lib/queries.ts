@@ -267,6 +267,7 @@ export async function getCompareEntities(ids: string[]): Promise<CompareEntity[]
       WHERE p.id IN (${ids.map(() => '?').join(',')}) AND p.status = 'published' AND p.deleted_at IS NULL`,
     ids,
   );
+  const weights = await getJsonSetting<ScoreWeights>('score_weights', DEFAULT_WEIGHTS);
   const out: CompareEntity[] = [];
   for (const id of ids) {
     const r = rows.find((x) => x.id === id);
@@ -275,9 +276,23 @@ export async function getCompareEntities(ids: string[]): Promise<CompareEntity[]
       db.get<any>('SELECT * FROM bike_specs WHERE product_id = ? AND variant_id IS NULL', [id]),
       db.get<any>('SELECT * FROM ev_specs WHERE product_id = ? AND variant_id IS NULL', [id]),
     ]);
+    // Compute live if the stored column is null (common — we never back-fill
+    // p.score on writes). Guarantees the 'Bikepick Score' comparison row is
+    // never omitted as "no data".
+    let computedScore: number | null = r.score;
+    if (computedScore == null && r.price_min != null) {
+      try {
+        computedScore = computeScore(
+          { price: r.price_min, fuelType: r.fuel_type, bike: bike || null, ev: ev || null, segment: {} },
+          weights,
+        ).total;
+      } catch {
+        computedScore = null;
+      }
+    }
     out.push({
       id: r.id, name: r.name, brand: r.brand_name, slug: r.slug, brandSlug: r.brand_slug,
-      image: r.image_url, price: r.price_min, fuelType: r.fuel_type, score: r.score,
+      image: r.image_url, price: r.price_min, fuelType: r.fuel_type, score: computedScore,
       bike: bike || null, ev: ev || null,
     });
   }

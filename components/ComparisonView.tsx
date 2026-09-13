@@ -20,11 +20,17 @@ export function ComparisonView({ entities, picker, ids, title, crumbs, weights =
   crumbs: { name: string; url: string }[];
   weights?: ScoreWeights;
 }) {
-  const { groups, verdict } = buildComparison(entities);
   const scores = entities.map((e) => ({
     entity: e,
     result: computeScore({ price: e.price, fuelType: e.fuelType, bike: e.bike, ev: e.ev, segment: {} }, weights),
   }));
+  // Ensure the 'Bikepick Score' row in the spec table is always populated
+  // with the live computed score — the stored p.score column is often null
+  // (we never back-fill it), so buildComparison would otherwise omit the row
+  // and the score would appear only in the header cards, looking "not visible"
+  // in the table.
+  const entitiesWithScore = entities.map((e, i) => ({ ...e, score: scores[i].result.total }));
+  const { groups, verdict } = buildComparison(entitiesWithScore);
   const winner = [...scores].sort((a, b) => b.result.total - a.result.total)[0];
 
   return (

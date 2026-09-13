@@ -57,7 +57,7 @@ const suspRank = (v: string) => {
 
 export const ATTRIBUTES: AttributeDef[] = [
   { key: 'price', label: 'Ex-showroom price', group: 'Price', direction: 'lower', get: (e) => e.price, format: (v) => inr(v) },
-  { key: 'score', label: 'Bikepick Score', group: 'Price', direction: 'higher', get: (e) => e.score, format: (v) => (v ? `${v}/100` : '—') },
+  { key: 'score', label: 'Bikepick Score', group: 'Price', direction: 'higher', get: (e) => e.score, format: (v) => (v != null ? `${v}/100` : '—') },
 
   { key: 'engine_type', label: 'Engine type', group: 'Engine', direction: 'none', petrolOnly: true, get: (e) => e.bike?.engine_type },
   { key: 'engine_capacity_cc', label: 'Displacement', group: 'Engine', direction: 'higher', unit: 'cc', petrolOnly: true, get: (e) => e.bike?.engine_capacity_cc },
