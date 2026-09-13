@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Compare Score Fix Preview</title>
+<style>
+body{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif;background:#F6F8FB;color:#0B1220;margin:0;padding:24px}
+.card{background:#fff;border:1px solid #E7EBF0;border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-width:720px;margin:0 auto}
+.price{font-size:15px;font-weight:800}
+.muted{font-size:11px;color:#6B7686}
+.badge{display:inline-block;margin-top:8px;background:#E6F8F1;color:#00875C;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px}
+.ring-wrap{margin-top:12px;display:flex;justify-content:center}
+</style>
+</head>
+<body>
+<h2 style="text-align:center">Fixed Compare — score inside orange ring</h2>
+<p style="text-align:center;color:#6B7686;font-size:13px">Activa 6G vs Jupiter — both now show numbers inside the donut</p>
+<div class="grid">
+  <!-- Card 1 -->
+  <div class="card">
+    <div style="height:120px;display:grid;place-items:center;background:linear-gradient(180deg,#fbfbfc,#f1f1f2);border-radius:8px;color:#6B7686">Honda Activa 6G image</div>
+    <div style="margin-top:10px;font-size:11px;letter-spacing:.08em;color:#6B7686;font-weight:600">HONDA</div>
+    <div style="font-size:14px;font-weight:700">Activa 6G</div>
+    <div class="price">₹78,166</div>
+    <div class="muted">ex-showroom</div>
+    <div class="ring-wrap">
+      <!-- ScoreRing 50 -->
+      <div style="position:relative;width:62px;height:62px;flex-shrink:0" role="img" aria-label="Bikepick Score 50 out of 100">
+        <svg width="62" height="62" style="transform:rotate(-90deg)">
+          <circle cx="31" cy="31" r="26" fill="none" stroke="#E7EBF0" stroke-width="7"></circle>
+          <circle cx="31" cy="31" r="26" fill="none" stroke="#F59E0B" stroke-width="7" stroke-linecap="round" stroke-dasharray="163.36" stroke-dashoffset="81.68"></circle>
+        </svg>
+        <div style="position:absolute;inset:0;display:grid;place-items:center">
+          <span style="display:flex;flex-direction:column;align-items:center;line-height:1">
+            <span style="font-size:19px;font-weight:800;letter-spacing:-0.02em;color:#0B1220">50</span>
+            <span style="font-size:9px;font-weight:700;letter-spacing:.15em;color:#6B7686">/100</span>
+          </span>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:4px;font-size:13px;font-weight:800;letter-spacing:-0.02em">50<span style="font-size:11px;font-weight:500;color:#6B7686">/100</span></div>
+    <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#6B7686;text-transform:uppercase">Bikepick Score</div>
+  </div>
+  <!-- Card 2 -->
+  <div class="card">
+    <div style="height:120px;display:grid;place-items:center;background:linear-gradient(180deg,#fbfbfc,#f1f1f2);border-radius:8px;color:#6B7686">TVS Jupiter image</div>
+    <div style="margin-top:10px;font-size:11px;letter-spacing:.08em;color:#6B7686;font-weight:600">TVS</div>
+    <div style="font-size:14px;font-weight:700">Jupiter</div>
+    <div class="price">₹74,000</div>
+    <div class="muted">ex-showroom</div>
+    <div class="ring-wrap">
+      <!-- ScoreRing 51 -->
+      <div style="position:relative;width:62px;height:62px;flex-shrink:0" role="img" aria-label="Bikepick Score 51 out of 100">
+        <svg width="62" height="62" style="transform:rotate(-90deg)">
+          <circle cx="31" cy="31" r="26" fill="none" stroke="#E7EBF0" stroke-width="7"></circle>
+          <circle cx="31" cy="31" r="26" fill="none" stroke="#F59E0B" stroke-width="7" stroke-linecap="round" stroke-dasharray="163.36" stroke-dashoffset="80.05"></circle>
+        </svg>
+        <div style="position:absolute;inset:0;display:grid;place-items:center">
+          <span style="display:flex;flex-direction:column;align-items:center;line-height:1">
+            <span style="font-size:19px;font-weight:800;letter-spacing:-0.02em;color:#0B1220">51</span>
+            <span style="font-size:9px;font-weight:700;letter-spacing:.15em;color:#6B7686">/100</span>
+          </span>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:4px;font-size:13px;font-weight:800;letter-spacing:-0.02em">51<span style="font-size:11px;font-weight:500;color:#6B7686">/100</span></div>
+    <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#6B7686;text-transform:uppercase">Bikepick Score</div>
+    <div class="badge">Highest score</div>
+  </div>
+</div>
+<p style="text-align:center;margin-top:20px;font-size:13px;color:#6B7686">Below this, the Price table now has a <b>Bikepick Score</b> row: Activa 6G 50/100 — Jupiter 51/100 (Jupiter green highlighted as best)</p>
+</body>
+</html>

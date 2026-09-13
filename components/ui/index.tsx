@@ -33,19 +33,20 @@ export function SectionHeader({ title, subtitle, action }: { title: string; subt
 export function ScoreRing({ score, size = 80, showValue = true }: { score: number; size?: number; showValue?: boolean }) {
   const r = (size - 10) / 2;
   const c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(100, score));
+  const safeScore = Number.isFinite(score) ? Math.round(score) : 0;
+  const pct = Math.max(0, Math.min(100, safeScore));
   const colour = pct >= 75 ? '#00B27A' : pct >= 55 ? '#F0620C' : '#F59E0B';
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={`Bikepick Score ${score} out of 100`}>
-      <svg width={size} height={size} className="-rotate-90">
+    <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={`Bikepick Score ${safeScore} out of 100`}>
+      <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E7EBF0" strokeWidth="7" />
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={colour} strokeWidth="7" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} />
       </svg>
       {showValue && (
-        <div className="absolute inset-0 grid place-items-center overflow-hidden">
-          <span className="flex items-baseline gap-px whitespace-nowrap">
-            <span className="text-[17px] font-bold leading-none">{score}</span>
-            <span className="text-[8px] font-medium text-ink-mute">/100</span>
+        <div className="absolute inset-0 grid place-items-center">
+          <span className="flex flex-col items-center leading-none">
+            <span className="text-[19px] font-extrabold leading-none tracking-tight text-ink">{safeScore}</span>
+            <span className="text-[9px] font-bold tracking-widest text-ink-mute">/100</span>
           </span>
         </div>
       )}

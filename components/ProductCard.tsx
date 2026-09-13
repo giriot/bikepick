@@ -50,13 +50,13 @@ export function ProductCard({ p, showCompare = true }: { p: Card; showCompare?: 
             <>
               <Spec label="Range" value={range ? `${Math.round(range)} km` : '—'} />
               <Spec label="Battery" value={p.battery_capacity_kwh ? `${p.battery_capacity_kwh} kWh` : '—'} />
-              <Spec label="Score" value={p.score ? `${p.score}` : '—'} />
+              <Spec label="Score" value={p.score != null ? `${p.score}` : '—'} />
             </>
           ) : (
             <>
               <Spec label="Engine" value={p.engine_capacity_cc ? `${Math.round(p.engine_capacity_cc)} cc` : '—'} />
               <Spec label="Mileage" value={p.mileage_kmpl ? `${p.mileage_kmpl} kmpl` : '—'} />
-              <Spec label="Score" value={p.score ? `${p.score}` : '—'} />
+              <Spec label="Score" value={p.score != null ? `${p.score}` : '—'} />
             </>
           )}
         </dl>

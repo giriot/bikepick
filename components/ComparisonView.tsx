@@ -20,11 +20,17 @@ export function ComparisonView({ entities, picker, ids, title, crumbs, weights =
   crumbs: { name: string; url: string }[];
   weights?: ScoreWeights;
 }) {
-  const { groups, verdict } = buildComparison(entities);
   const scores = entities.map((e) => ({
     entity: e,
     result: computeScore({ price: e.price, fuelType: e.fuelType, bike: e.bike, ev: e.ev, segment: {} }, weights),
   }));
+  // Ensure the 'Bikepick Score' row in the spec table is always populated
+  // with the live computed score — the stored p.score column is often null
+  // (we never back-fill it), so buildComparison would otherwise omit the row
+  // and the score would appear only in the header cards, looking "not visible"
+  // in the table.
+  const entitiesWithScore = entities.map((e, i) => ({ ...e, score: scores[i].result.total }));
+  const { groups, verdict } = buildComparison(entitiesWithScore);
   const winner = [...scores].sort((a, b) => b.result.total - a.result.total)[0];
 
   return (
@@ -54,7 +60,12 @@ export function ComparisonView({ entities, picker, ids, title, crumbs, weights =
               <p className="mt-1 text-[15px] font-bold">{inr(entity.price)}</p>
               <p className="text-[10.5px] text-ink-mute">ex-showroom</p>
               <div className="mt-2 flex justify-center"><ScoreRing score={result.total} size={62} /></div>
-              {winner.entity.id === entity.id && <span className="badge mt-2 bg-accent-soft text-accent-dark">Highest score</span>}
+              <p className="mt-1 text-[13px] font-bold leading-none tracking-tight">
+                {result.total}
+                <span className="text-[11px] font-medium text-ink-mute">/100</span>
+              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mute">Bikepick Score</p>
+              {winner.entity.id === entity.id && <span className="badge mt-1.5 bg-accent-soft text-accent-dark">Highest score</span>}
             </div>
           ))}
         </div>
