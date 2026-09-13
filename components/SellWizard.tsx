@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { fileSize } from '@/lib/format';
 
 interface Props {
   signedIn: boolean;
@@ -18,12 +19,24 @@ const OPTIONAL_ANGLES = [['damage', 'Damage (if any)'], ['chassis', 'VIN / chass
 
 const STEPS = ['Vehicle', 'Condition', 'Paperwork', 'Photos', 'Price & submit'] as const;
 
+/** An uploaded photo: where it lives, and what it actually weighs on disk
+ *  after the server's automatic compression (sizes come from the upload
+ *  response; dimensions are null when the file was stored as uploaded). */
+interface Photo {
+  url: string;
+  bytes: number;
+  originalBytes: number;
+  compressed: boolean;
+  width: number | null;
+  height: number | null;
+}
+
 export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ slug: string; status: string } | null>(null);
-  const [photos, setPhotos] = useState<Record<string, string>>({});
+  const [photos, setPhotos] = useState<Record<string, Photo>>({});
   const [uploading, setUploading] = useState<string | null>(null);
   const [valuation, setValuation] = useState<any>(null);
 
@@ -91,8 +104,20 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
     const res = await fetch('/api/uploads', { method: 'POST', body });
     const json = await res.json();
     setUploading(null);
-    if (json.ok) setPhotos((p) => ({ ...p, [angle]: json.data.url }));
-    else setError(json.error || 'Upload failed');
+    const d = json.data || {};
+    if (json.ok && d.url) {
+      setPhotos((p) => ({
+        ...p,
+        [angle]: {
+          url: d.url,
+          bytes: Number(d.bytes) || file.size,
+          originalBytes: Number(d.original_bytes) || file.size,
+          compressed: Boolean(d.compressed),
+          width: Number(d.width) || null,
+          height: Number(d.height) || null,
+        },
+      }));
+    } else setError(json.error || 'Upload failed');
   };
 
   const submit = async () => {
@@ -107,7 +132,7 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
         registration_year: f.registration_year ? Number(f.registration_year) : undefined,
         km_driven: Number(f.km_driven), owners: Number(f.owners), asking_price: Number(f.asking_price),
         abs_equipped: f.abs_equipped === 'yes',
-        images: Object.entries(photos).map(([angle, image_url]) => ({ angle, image_url })),
+        images: Object.entries(photos).map(([angle, photo]) => ({ angle, image_url: photo.url })),
       }),
     });
     const json = await res.json();
@@ -307,11 +332,18 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
                     {label} {REQUIRED_ANGLES.some(([a]) => a === angle) && <span className="text-danger">*</span>}
                   </p>
                   {photos[angle] ? (
-                    <div className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={photos[angle]} alt={`${label} preview`} className="h-24 w-full rounded-lg object-cover" />
-                      <button type="button" onClick={() => setPhotos((p) => { const n = { ...p }; delete n[angle]; return n; })} className="absolute right-1 top-1 rounded-lg bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-danger">Remove</button>
-                    </div>
+                    <>
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={photos[angle].url} alt={`${label} preview`} className="h-24 w-full rounded-lg object-cover" />
+                        <button type="button" onClick={() => setPhotos((p) => { const n = { ...p }; delete n[angle]; return n; })} className="absolute right-1 top-1 rounded-lg bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-danger">Remove</button>
+                      </div>
+                      <p className="mt-1 text-[11px] leading-4 text-ink-mute">
+                        <span className="font-medium text-ink">{fileSize(photos[angle].bytes)}</span>
+                        {photos[angle].compressed ? ` — compressed from ${fileSize(photos[angle].originalBytes)}` : ' as uploaded'}
+                        {photos[angle].width ? ` · ${photos[angle].width}×${photos[angle].height}px` : ''}
+                      </p>
+                    </>
                   ) : (
                     <label className="flex h-24 cursor-pointer items-center justify-center rounded-lg bg-surface text-[12px] text-ink-mute hover:bg-brand-50">
                       {uploading === angle ? 'Uploading…' : '+ Add photo'}
