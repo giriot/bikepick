@@ -4,13 +4,14 @@ import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { listUsedBikes } from '@/lib/queries';
-import { inr, dateIn, relative, titleCase } from '@/lib/format';
+import { inr, relative, titleCase } from '@/lib/format';
 import { computeTrust, DEFAULT_TRUST_WEIGHTS, REQUIRED_ANGLES, type TrustWeights } from '@/lib/trust';
 import { getJsonSetting } from '@/lib/settings';
 import { buildMetadata, breadcrumbJsonLd, JsonLd } from '@/lib/seo';
 import { Breadcrumbs, Notice, SectionHeader, TrustBadge } from '@/components/ui';
 import { LeadDialog } from '@/components/LeadDialog';
 import { SellerPhoneReveal } from '@/components/SellerPhoneReveal';
+import { UsedBikeGallery } from '@/components/UsedBikeGallery';
 import { SaveButton } from '@/components/SaveButton';
 import { AdSlot } from '@/components/AdSlot';
 
@@ -20,13 +21,12 @@ export const maxDuration = 60;
 async function load(slug: string) {
   const bike = await db.get<any>('SELECT * FROM used_bikes WHERE slug = ? AND deleted_at IS NULL', [slug]);
   if (!bike) return null;
-  const [images, checks, dealer, inspection] = await Promise.all([
+  const [images, checks, dealer] = await Promise.all([
     db.all<any>('SELECT * FROM used_bike_images WHERE used_bike_id = ? AND approved = 1 ORDER BY sort_order', [bike.id]),
     db.all<any>("SELECT * FROM verification_records WHERE entity_type='used_bike' AND entity_id = ?", [bike.id]),
     bike.dealer_id ? db.get<any>('SELECT * FROM dealer_profiles WHERE id = ?', [bike.dealer_id]) : Promise.resolve(null),
-    db.get<any>("SELECT * FROM inspections WHERE used_bike_id = ? AND status='completed' ORDER BY created_at DESC", [bike.id]),
   ]);
-  return { bike, images, checks, dealer, inspection };
+  return { bike, images, checks, dealer };
 }
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 export default async function UsedBikePage({ params }: { params: { slug: string } }) {
   const data = await load(params.slug);
   if (!data) notFound();
-  const { bike, images, checks, dealer, inspection } = data;
+  const { bike, images, checks, dealer } = data;
 
   const user = await getCurrentUser();
   const isSaved = user
@@ -99,23 +99,13 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
 
       <div className="mt-4 grid items-start gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <div className="min-w-0">
-          <div className="product-stage aspect-[8/5] border border-line">
-            <Image src={images[0]?.image_url || '/media/used.svg'} alt={`${bike.brand_name} ${bike.model_name}`} width={880} height={550} priority className="h-full w-full object-contain" />
-            <div className="absolute left-3 top-3 flex gap-1.5">
-              {bike.is_demo === 1 && <span className="badge-demo">Demo listing</span>}
-              {bike.fuel_type === 'electric' && <span className="badge-ev">Electric</span>}
-            </div>
-          </div>
-          {images.length > 1 && (
-            <ul className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
-              {images.map((img: any) => (
-                <li key={img.id} className="product-stage aspect-[4/3] border border-line">
-                  <Image src={img.image_url} alt={`${img.angle} view`} width={160} height={120} loading="lazy" className="h-full w-full object-contain" />
-                  <span className="absolute bottom-0.5 left-0.5 rounded bg-white/85 px-1 text-[9px] uppercase tracking-wide text-ink-mute">{img.angle}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <UsedBikeGallery
+            images={images.map((image: any) => ({ id: image.id, angle: image.angle, image_url: image.image_url }))}
+            brandName={bike.brand_name}
+            modelName={bike.model_name}
+            isElectric={bike.fuel_type === 'electric'}
+            isDemo={bike.is_demo === 1}
+          />
           <p className="mt-2 text-[11.5px] text-ink-mute">
             {images.length} of {REQUIRED_ANGLES.length} required angles uploaded. Seller documents are stored privately
             and are never shown publicly.
@@ -206,43 +196,10 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
         </div>
       </div>
 
-      {/* ------------------------- TRUST BREAKDOWN ------------------------- */}
+      {/* ------------------------- COMPACT VERIFICATION -------------------- */}
       <section className="mt-8">
-        <SectionHeader title={`Trust score: ${trust.score}/100 — ${trust.label}`} subtitle="Points are awarded only for checks that were actually completed and recorded." />
-        <div className="grid gap-2 md:grid-cols-2">
-          {trust.factors.map((f) => (
-            <div key={f.key} className="card flex items-start gap-2.5 p-3">
-              <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold ${f.state === 'done' ? 'bg-accent-soft text-accent-dark' : f.state === 'partial' ? 'bg-warn-soft text-[#8A5B00]' : 'bg-surface text-ink-mute'}`} aria-hidden="true">
-                {f.state === 'done' ? '✓' : f.state === 'partial' ? '~' : '–'}
-              </span>
-              <div className="flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[13.5px] font-semibold">{f.label}</p>
-                  <span className="text-[12px] text-ink-mute">{f.earned}/{f.possible}</span>
-                </div>
-                <p className="mt-0.5 text-[12.5px] leading-5 text-ink-mute">{f.note}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4">
-          <Notice tone="warn">
-            <strong>What this score does not mean.</strong> It is not a mechanical warranty and not a guarantee of
-            condition. {inspection ? 'A physical inspection was completed for this listing and its findings are summarised below.' : 'No physical inspection has been performed on this vehicle.'}{' '}
-            Bikepick.IN never claims a check that did not happen.
-          </Notice>
-        </div>
-
-        {inspection?.report && (
-          <div className="card mt-4 p-5">
-            <h3 className="text-sm font-semibold">Inspection report summary</h3>
-            <p className="mt-1 text-[11.5px] text-ink-mute">Completed {dateIn(inspection.scheduled_at || inspection.updated_at)}</p>
-            <p className="mt-2 whitespace-pre-line text-[13px] leading-6 text-ink-soft">{inspection.report}</p>
-          </div>
-        )}
-
-        <div className="card mt-4 p-3 sm:p-4">
+        <SectionHeader title="Verification status" subtitle="A tick means the check was passed; a cross means it was not passed or has not been recorded." />
+        <div className="card p-3 sm:p-4">
           <div className="grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-2" role="list" aria-label="Verification status">
             {['seller_identity', 'ownership_declaration', 'rc_verification', 'insurance_verification', 'puc_verification', 'loan_status', 'service_history', 'physical_inspection'].map((type) => {
               const rec = checks.find((c: any) => c.check_type === type);
