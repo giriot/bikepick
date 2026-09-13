@@ -12,6 +12,7 @@ import { RowActions } from '@/components/admin/RowActions';
 import { ProductImagesPanel } from '@/components/admin/ProductImagesPanel';
 import { BrandLogoPanel } from '@/components/admin/BrandLogoPanel';
 import { UsedBikeReviewPanel } from '@/components/admin/UsedBikeReviewPanel';
+import { getUsedBikeApprovalReadiness } from '@/lib/trust-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: { params: { resource: string 
 export default async function AdminEdit({ params }: { params: { resource: string; id: string } }) {
   const resource = getResource(params.resource);
   if (!resource) notFound();
-  await requirePermission(resource.permission === '*' ? '*' : resource.permission);
+  const currentUser = await requirePermission(resource.permission === '*' ? '*' : resource.permission);
 
   const isNew = params.id === 'new';
   if (isNew && !resource.canCreate) notFound();
@@ -45,6 +46,10 @@ export default async function AdminEdit({ params }: { params: { resource: string
   );
 
   const title = isNew ? `New ${resource.label.toLowerCase()}` : String(row[resource.titleColumn] || resource.label);
+
+  const usedBikeReadiness = !isNew && resource.key === 'used-bikes'
+    ? await getUsedBikeApprovalReadiness(params.id)
+    : null;
 
   // Public "View on site" URL. Products live at /{bikes|electric}/{brand}/{slug}
   // (the brand slug + fuel type are required — the naive publicPath/{slug}
@@ -161,7 +166,7 @@ export default async function AdminEdit({ params }: { params: { resource: string
                   Actions here notify the person affected and are written to the audit log.
                 </p>
                 <div className="mt-3">
-                  <RowActions resource={resource.key} id={params.id} row={row} actions={resource.actions || []} canDelete={resource.canDelete} />
+                  <RowActions resource={resource.key} id={params.id} row={row} actions={resource.actions || []} canDelete={resource.canDelete} readiness={usedBikeReadiness} userRole={currentUser.role} />
                 </div>
               </div>
             )}

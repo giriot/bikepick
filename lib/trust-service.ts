@@ -15,12 +15,21 @@ export interface ApprovalReadiness {
   missingDocuments: string[];
 }
 
+export interface ApprovalReadinessOptions {
+  /** Used only by the explicit, admin-only publish exception. */
+  allowMissingDocuments?: boolean;
+}
+
 /**
  * Publishing is a deliberate workflow transition, not just a status dropdown.
- * Keep the gate small and explicit: the seller must have supplied the core
- * documents and a verifier must have recorded every required check as passed.
+ * The normal gate requires the core documents, every required check and all
+ * required photo angles. An explicit admin-only exception may waive documents,
+ * but never verification checks or photos.
  */
-export async function getUsedBikeApprovalReadiness(usedBikeId: string): Promise<ApprovalReadiness> {
+export async function getUsedBikeApprovalReadiness(
+  usedBikeId: string,
+  options: ApprovalReadinessOptions = {},
+): Promise<ApprovalReadiness> {
   const bike = await db.get<any>('SELECT loan_status FROM used_bikes WHERE id = ?', [usedBikeId]);
   if (!bike) return { ok: false, message: 'Listing not found', missingChecks: [], missingDocuments: [] };
 
@@ -44,9 +53,10 @@ export async function getUsedBikeApprovalReadiness(usedBikeId: string): Promise<
     missingChecks.push(`required photos: ${missingAngles.join(', ')}`);
   }
 
-  if (missingChecks.length || missingDocuments.length) {
+  const documentsBlock = missingDocuments.length > 0 && !options.allowMissingDocuments;
+  if (missingChecks.length || documentsBlock) {
     const parts: string[] = [];
-    if (missingDocuments.length) parts.push(`approved documents: ${missingDocuments.join(', ')}`);
+    if (documentsBlock) parts.push(`approved documents: ${missingDocuments.join(', ')}`);
     if (missingChecks.length) parts.push(`passed checks: ${missingChecks.join(', ')}`);
     return {
       ok: false,
@@ -56,7 +66,7 @@ export async function getUsedBikeApprovalReadiness(usedBikeId: string): Promise<
     };
   }
 
-  return { ok: true, missingChecks: [], missingDocuments: [] };
+  return { ok: true, missingChecks: [], missingDocuments };
 }
 
 export async function recomputeTrust(usedBikeId: string) {

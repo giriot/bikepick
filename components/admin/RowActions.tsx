@@ -8,8 +8,14 @@ const TONE: Record<string, string> = {
   danger: 'btn-outline border-rose-200 text-rose-700 hover:bg-rose-50', neutral: 'btn-outline',
 };
 
-export function RowActions({ resource, id, row, actions, canDelete }: {
-  resource: string; id: string; row: any; actions: AdminAction[]; canDelete?: boolean;
+export function RowActions({ resource, id, row, actions, canDelete, readiness, userRole }: {
+  resource: string;
+  id: string;
+  row: any;
+  actions: AdminAction[];
+  canDelete?: boolean;
+  readiness?: { missingDocuments: string[] } | null;
+  userRole?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -17,7 +23,12 @@ export function RowActions({ resource, id, row, actions, canDelete }: {
   const [reasonFor, setReasonFor] = useState<AdminAction | null>(null);
   const [reason, setReason] = useState('');
 
-  const available = actions.filter((a) => !a.when || a.when.in.includes(String(row[a.when.column])));
+  const available = actions.filter((a) => {
+    if (a.when && !a.when.in.includes(String(row[a.when.column]))) return false;
+    if (a.permission === '*' && userRole !== 'admin') return false;
+    if (a.allowMissingDocuments && !readiness?.missingDocuments?.length) return false;
+    return true;
+  });
 
   async function run(action: AdminAction, reasonText?: string) {
     setBusy(action.key); setError(null);
@@ -51,7 +62,7 @@ export function RowActions({ resource, id, row, actions, canDelete }: {
         {available.map((a) => (
           <button key={a.key} disabled={!!busy}
             className={`${TONE[a.tone || 'neutral']} btn-sm`}
-            onClick={() => (a.reasonColumn ? setReasonFor(a) : run(a))}>
+            onClick={() => (a.reasonColumn || a.requiresReason ? setReasonFor(a) : run(a))}>
             {busy === a.key ? 'Working…' : a.label}
           </button>
         ))}
@@ -65,10 +76,10 @@ export function RowActions({ resource, id, row, actions, canDelete }: {
       {reasonFor && (
         <div className="rounded-xl border border-line bg-surface p-3">
           <label className="label" htmlFor={`reason-${id}`}>
-            Reason — the person affected sees this
+            {reasonFor.reasonPrompt || 'Reason — the person affected sees this'}
           </label>
           <textarea id={`reason-${id}`} rows={2} className="field" value={reason} onChange={(e) => setReason(e.target.value)}
-            placeholder="Be specific so they know exactly what to fix." />
+            placeholder={reasonFor.reasonPlaceholder || 'Be specific so they know exactly what to fix.'} />
           <div className="mt-2 flex gap-2">
             <button className="btn-primary btn-sm" disabled={reason.trim().length < 5 || !!busy}
               onClick={() => run(reasonFor, reason)}>

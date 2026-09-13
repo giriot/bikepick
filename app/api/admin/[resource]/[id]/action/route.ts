@@ -29,8 +29,13 @@ export async function POST(req: NextRequest, { params }: { params: { resource: s
     if (action.when && !action.when.in.includes(String(row[action.when.column]))) {
       return fail(`This action is not available while the record is "${row[action.when.column]}"`, 409);
     }
-    if (action.reasonColumn && (!body.reason || body.reason.trim().length < 5)) {
-      return fail('Please give a reason of at least 5 characters — the person affected sees it', 422);
+    if ((action.reasonColumn || action.requiresReason) && (!body.reason || body.reason.trim().length < 5)) {
+      return fail(
+        action.requiresReason
+          ? 'Please give an override reason of at least 5 characters — it will be stored in the audit log'
+          : 'Please give a reason of at least 5 characters — the person affected sees it',
+        422,
+      );
     }
 
     const cols = await tableColumns(resource.table);
@@ -41,12 +46,21 @@ export async function POST(req: NextRequest, { params }: { params: { resource: s
     }
     if (action.reasonColumn && cols.has(action.reasonColumn)) set[action.reasonColumn] = body.reason!.trim();
 
+    const isDocumentOverride = resource.key === 'used-bikes' && action.key === 'approve_without_documents';
+    if (isDocumentOverride && user.role !== 'admin') return fail('Only an administrator can publish without documents', 403);
+
     // A listing is not publishable merely because a reviewer clicked a button.
     // Check the private documents and verification records first, then promote
     // the staged photos. Failed promotion leaves the listing unpublished.
+    let approvalReadiness: Awaited<ReturnType<typeof getUsedBikeApprovalReadiness>> | null = null;
     if (resource.key === 'used-bikes' && set.status === 'approved') {
-      const readiness = await getUsedBikeApprovalReadiness(params.id);
-      if (!readiness.ok) return fail(readiness.message || 'Complete verification before publishing', 422);
+      approvalReadiness = await getUsedBikeApprovalReadiness(params.id, {
+        allowMissingDocuments: isDocumentOverride,
+      });
+      if (isDocumentOverride && approvalReadiness.missingDocuments.length === 0) {
+        return fail('All required documents are already approved; use the normal Approve & publish action', 409);
+      }
+      if (!approvalReadiness.ok) return fail(approvalReadiness.message || 'Complete verification before publishing', 422);
       const promoted = await promoteUsedBikeImages(params.id);
       if (promoted.missing || promoted.failed) {
         return fail('Some listing photos could not be prepared for publication. Re-upload them and try again.', 422);
@@ -70,7 +84,7 @@ export async function POST(req: NextRequest, { params }: { params: { resource: s
         userId: row[resource.ownerColumn],
         event: action.notify.event as NotificationEvent,
         title: action.notify.title,
-        body: body.reason?.trim() || action.notify.body,
+        body: action.notifyReason === false ? action.notify.body : body.reason?.trim() || action.notify.body,
         link: resource.key === 'used-bikes'
           ? (set.status === 'approved' ? `/used-bikes/${row.slug}` : '/account/listings')
           : undefined,
@@ -78,7 +92,13 @@ export async function POST(req: NextRequest, { params }: { params: { resource: s
       });
     }
 
-    await audit(user, `${resource.key}.${action.key}`, resource.table, params.id, { reason: body.reason || null });
+    await audit(user, `${resource.key}.${action.key}`, resource.table, params.id, {
+      reason: body.reason || null,
+      ...(isDocumentOverride ? {
+        document_override: true,
+        missing_documents: approvalReadiness?.missingDocuments || [],
+      } : {}),
+    });
     return ok({ id: params.id, action: action.key }, `${action.label} done`);
   } catch (e) {
     return handleError(e);

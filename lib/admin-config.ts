@@ -43,6 +43,14 @@ export interface AdminAction {
   set: Record<string, string | number | null>;
   /** Requires a typed reason, stored in this column. */
   reasonColumn?: string;
+  /** Requires a typed reason that is recorded in the audit log, without a row column. */
+  requiresReason?: boolean;
+  reasonPrompt?: string;
+  reasonPlaceholder?: string;
+  /** Whether the reason should be shown to the notified user. */
+  notifyReason?: boolean;
+  /** Used only for the admin-only used-bike document exception. */
+  allowMissingDocuments?: boolean;
   tone?: 'primary' | 'danger' | 'neutral' | 'success';
   /** Only offer the action when the row is in one of these statuses. */
   when?: { column: string; in: string[] };
@@ -345,6 +353,8 @@ export const ADMIN_RESOURCES: AdminResource[] = [
       { key: 'review', label: 'Start review', set: { status: 'under_review' }, tone: 'neutral', when: { column: 'status', in: ['submitted', 'verification_required', 'needs_more_info'] }, permission: 'used_bike.review' },
       { key: 'approve', label: 'Approve & publish', set: { status: 'approved', approved_at: '$now', approved_by: '$user' }, tone: 'success', when: { column: 'status', in: ['submitted', 'verification_required', 'under_review', 'needs_more_info', 'suspended'] }, permission: 'used_bike.review',
         notify: { event: 'used_bike_approved', title: 'Your listing is live', body: 'Your used-bike listing passed review and is now visible to buyers.' } },
+      { key: 'approve_without_documents', label: 'Publish without documents', set: { status: 'approved', approved_at: '$now', approved_by: '$user' }, tone: 'neutral', when: { column: 'status', in: ['submitted', 'verification_required', 'under_review', 'needs_more_info', 'suspended'] }, permission: '*', requiresReason: true, reasonPrompt: 'Override reason — stored in the audit log', reasonPlaceholder: 'Explain why the documents are unavailable and what was independently checked.', notifyReason: false, allowMissingDocuments: true,
+        notify: { event: 'used_bike_approved', title: 'Your listing is live', body: 'Your used-bike listing is now visible to buyers.' } },
       { key: 'info', label: 'Request more info', set: { status: 'needs_more_info' }, reasonColumn: 'info_request', tone: 'neutral', when: { column: 'status', in: ['submitted', 'verification_required', 'under_review'] }, permission: 'used_bike.review',
         notify: { event: 'used_bike_info_required', title: 'We need a bit more information', body: 'Open your listing to see exactly what is missing.' } },
       { key: 'reject', label: 'Reject', set: { status: 'rejected' }, reasonColumn: 'rejection_reason', tone: 'danger', when: { column: 'status', in: ['submitted', 'verification_required', 'under_review', 'needs_more_info', 'approved'] }, permission: 'used_bike.review',

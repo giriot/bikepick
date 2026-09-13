@@ -101,7 +101,7 @@ export async function UsedBikeReviewPanel({ usedBikeId }: { usedBikeId: string }
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <h2 className="text-[14px] font-semibold">Seller documents</h2>
-              <p className="mt-0.5 text-[12px] text-ink-mute">Private files for verification. Never publish these links.</p>
+              <p className="mt-0.5 text-[12px] text-ink-mute">Private files for verification. Never publish these links. If a required document is unavailable, an administrator can use the audited exception after completing the checks and photo review.</p>
             </div>
             <span className="rounded-full bg-surface px-2.5 py-1 text-[11px] font-medium text-ink-mute">{documents.length} files</span>
           </div>
