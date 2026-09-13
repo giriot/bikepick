@@ -267,7 +267,10 @@ export async function getCompareEntities(ids: string[]): Promise<CompareEntity[]
       WHERE p.id IN (${ids.map(() => '?').join(',')}) AND p.status = 'published' AND p.deleted_at IS NULL`,
     ids,
   );
-  const weights = await getJsonSetting<ScoreWeights>('score_weights', DEFAULT_WEIGHTS);
+  let weights: ScoreWeights = DEFAULT_WEIGHTS;
+  try {
+    weights = await getJsonSetting<ScoreWeights>('score_weights', DEFAULT_WEIGHTS);
+  } catch {}
   const out: CompareEntity[] = [];
   for (const id of ids) {
     const r = rows.find((x) => x.id === id);
