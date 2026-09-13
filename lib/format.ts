@@ -9,6 +9,22 @@ export function inr(value: number | null | undefined, opts: { compact?: boolean 
 }
 
 /**
+ * Human-readable file size, matching what the browser's file picker reported
+ * (1024-based). Used under uploaded photos so a seller can see what their
+ * image actually weighs after our automatic compression.
+ */
+export function fileSize(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return '—';
+  if (n < 1024) return `${Math.round(n)} B`;
+  const kb = n / 1024;
+  if (kb < 1024) return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`;
+  const mb = kb / 1024;
+  return `${mb < 10 ? mb.toFixed(2) : mb.toFixed(1)} MB`;
+}
+
+/**
  * Parse a stored `product_ids` value into a clean string[] of ids.
  *
  * The comparisons / saved_comparisons tables contain both shapes:

@@ -13,6 +13,9 @@ export interface CompressResult {
   originalBytes: number;
   compressedBytes: number;
   changed: boolean;
+  /** Final stored dimensions, or null when the file was kept as-is (we did not decode it). */
+  width: number | null;
+  height: number | null;
 }
 
 const MAX_WIDTH = 1920;
@@ -25,7 +28,7 @@ async function getBuffer(img: any, mime: string, options?: any): Promise<Buffer>
 }
 
 export async function compressImage(buffer: Buffer, contentType: string): Promise<CompressResult> {
-  const result: CompressResult = { buffer, contentType, originalBytes: buffer.length, compressedBytes: buffer.length, changed: false };
+  const result: CompressResult = { buffer, contentType, originalBytes: buffer.length, compressedBytes: buffer.length, changed: false, width: null, height: null };
   if (!/image\/(jpeg|png|webp)/i.test(contentType)) return result;
   if (buffer.length < MIN_BYTES_TO_TRY) return result;
 
@@ -33,6 +36,9 @@ export async function compressImage(buffer: Buffer, contentType: string): Promis
     const mod: any = await import('jimp');
     const JimpCtor = mod.default?.Jimp || mod.Jimp || mod.default;
     const img = await JimpCtor.fromBuffer(buffer);
+    // Dimensions as uploaded — reported whenever we keep the original bytes.
+    const srcWidth = img.bitmap.width;
+    const srcHeight = img.bitmap.height;
     if (img.width > MAX_WIDTH) img.resize({ w: MAX_WIDTH, limitImage: true });
 
     let out: Buffer;
@@ -52,8 +58,11 @@ export async function compressImage(buffer: Buffer, contentType: string): Promis
       outMime = 'image/jpeg';
     }
 
-    if (out.length >= buffer.length) return result; // never make it worse
-    return { buffer: out, contentType: outMime, originalBytes: buffer.length, compressedBytes: out.length, changed: true };
+    const { width, height } = img.bitmap; // dimensions of the re-encoded bytes
+    // Re-encode did not help — keep the original bytes untouched, so the
+    // dimensions we report must be the original ones, not the resized ones.
+    if (out.length >= buffer.length) return { ...result, width: srcWidth, height: srcHeight };
+    return { buffer: out, contentType: outMime, originalBytes: buffer.length, compressedBytes: out.length, changed: true, width, height };
   } catch {
     return result; // decode failure -> keep original, never block the upload
   }

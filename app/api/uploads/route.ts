@@ -39,13 +39,21 @@ export async function POST(req: NextRequest) {
     let contentType = file.type;
     const originalBytes = buffer.length;
 
+    // What the seller's preview caption needs: the real stored size, whether we
+    // re-encoded it, and its true dimensions (null when stored as uploaded).
+    let compressed = false;
+    let width: number | null = null;
+    let height: number | null = null;
     // Automatic background compression for public photos: full HD display
     // (max 1920px wide) + efficient re-encode to cut storage. Original bytes
     // are kept if compression would not help.
     if (config.bucket === 'public-media' && /image\/(jpeg|png|webp)/i.test(file.type)) {
-      const compressed = await compressImage(buffer, file.type);
-      buffer = compressed.buffer;
-      contentType = compressed.contentType;
+      const comp = await compressImage(buffer, file.type);
+      buffer = comp.buffer;
+      contentType = comp.contentType;
+      compressed = comp.changed;
+      width = comp.width;
+      height = comp.height;
     }
 
     const result = await storage().put({ bucket: config.bucket, key, body: buffer, contentType });
@@ -54,9 +62,13 @@ export async function POST(req: NextRequest) {
       key: result.key,
       url: result.url,          // null for private documents — by design
       private: config.bucket === 'private-docs',
-      compressed: buffer.length < originalBytes,
+      compressed,
       original_bytes: originalBytes,
       bytes: buffer.length,
+      // Null when the file was stored as-is (tiny / unsupported format), so the
+      // UI never shows a dimension it does not actually know.
+      width,
+      height,
     }, 'Uploaded');
   } catch (e) {
     return handleError(e);
