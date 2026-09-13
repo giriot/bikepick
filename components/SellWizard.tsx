@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { fileSize } from '@/lib/format';
+import { USED_BIKE_DOCUMENT_TYPES, type UsedBikeDocumentType } from '@/lib/used-bike-documents';
 
 interface Props {
   signedIn: boolean;
@@ -34,6 +35,12 @@ interface Photo {
   height: number | null;
 }
 
+interface SellerDocument {
+  key: string;
+  name: string;
+  bytes: number;
+}
+
 export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -41,6 +48,8 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
   const [done, setDone] = useState<{ slug: string; status: string } | null>(null);
   const [photos, setPhotos] = useState<Record<string, Photo>>({});
   const [uploading, setUploading] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<Record<string, SellerDocument>>({});
+  const [documentUploading, setDocumentUploading] = useState<string | null>(null);
   const [valuation, setValuation] = useState<any>(null);
   const [sellerPhone, setSellerPhone] = useState(defaults.phone || '');
 
@@ -69,6 +78,10 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
       if (!f.city) return 'Enter your city';
       if (!/^[6-9]\d{9}$/.test(normalizedSellerPhone)) return 'Enter a valid 10-digit mobile number for buyer contact';
       return null;
+    }
+    if (i === 2) {
+      if (documentUploading) return 'Wait for the document upload to finish';
+      if (!documents.identity || !documents.rc) return 'Upload your ID card and RC before continuing';
     }
     if (i === 3) {
       const missingAngles = REQUIRED_ANGLES.filter(([angle]) => !photos[angle]).map(([, label]) => label);
@@ -131,6 +144,27 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
     } else setError(json.error || 'Upload failed');
   };
 
+  const uploadDocument = async (docType: UsedBikeDocumentType, file: File) => {
+    setDocumentUploading(docType); setError(null);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('purpose', 'used_bike_document');
+      const res = await fetch('/api/uploads', { method: 'POST', body });
+      const json = await res.json();
+      const d = json.data || {};
+      if (!res.ok || !json.ok || !d.key) throw new Error(json.error || 'Document upload failed');
+      setDocuments((current) => ({
+        ...current,
+        [docType]: { key: d.key, name: file.name, bytes: Number(d.bytes) || file.size },
+      }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Document upload failed');
+    } finally {
+      setDocumentUploading(null);
+    }
+  };
+
   const submit = async () => {
     const err = stepValid(4);
     if (err) { setError(err); return; }
@@ -144,9 +178,10 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
         registration_year: f.registration_year ? Number(f.registration_year) : undefined,
         km_driven: Number(f.km_driven), owners: Number(f.owners), asking_price: Number(f.asking_price),
         abs_equipped: f.abs_equipped === 'yes',
-        // Submit the staged storage key, not the preview URL — the server
-        // verifies ownership and publishes the photo only on approval.
+        // Submit staged storage keys, not preview URLs. The server verifies
+        // ownership and keeps photos/documents private until approval.
         images: Object.entries(photos).map(([angle, photo]) => ({ angle, image_url: photo.key })),
+        documents: Object.entries(documents).map(([doc_type, document]) => ({ doc_type, file_key: document.key })),
       }),
     });
     const json = await res.json();
@@ -181,8 +216,8 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
         <p className="mx-auto mt-2 max-w-lg text-[13.5px] leading-6 text-ink-mute">
           Status: <strong className="text-ink">{done.status.replace(/_/g, ' ')}</strong>. Our team will verify your
           identity and documents before the listing becomes public. Use “Track my listing” to upload your RC, insurance and
-          identity documents if you have not already done so. You will be notified of the outcome — including if we need
-          more information.
+          identity card, Loan / NOC, service history or other documents if you have not already done so. You will be notified
+          of the outcome — including if we need more information.
         </p>
         <div className="mt-5 flex justify-center gap-2">
           <Link href="/account/listings" className="btn-primary">Track my listing</Link>
@@ -347,14 +382,34 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
                 <option value="no_loan">No loan taken</option><option value="loan_closed_noc">Loan closed, NOC available</option><option value="loan_running">Loan still running</option>
               </select>
             </Field>
-            <div className="sm:col-span-2 rounded-xl border border-line bg-surface p-4 text-[12.5px] leading-6 text-ink-mute">
-              <p className="font-semibold text-ink">Documents are collected after submission</p>
-              <p className="mt-1">
-                Once you submit, our verification team will request your RC, insurance and identity documents through a
-                private, secure upload. These files are stored in private storage, are never shown on the public
-                listing, and are visible only to authorised verifiers. We record only the result of each check
-                (passed / failed / not checked) — never the document itself on your listing.
-              </p>
+            <div className="sm:col-span-2 rounded-xl border border-brand-200 bg-brand-50 p-4">
+              <div>
+                <p className="text-[13.5px] font-semibold text-brand-900">Upload verification documents before submitting</p>
+                <p className="mt-1 text-[12px] leading-5 text-brand-900/80">
+                  Add each document on its own line. RC and ID card are required before continuing; insurance, Loan / NOC,
+                  service history and other evidence can be added when relevant. Files are private and never shown to buyers.
+                  Missing optional documents can still be supplied later from My listings.
+                </p>
+              </div>
+              <div className="mt-4 divide-y divide-brand-200 border-y border-brand-200">
+                {USED_BIKE_DOCUMENT_TYPES.map(([value, label]) => {
+                  const document = documents[value];
+                  return (
+                    <div key={value} className="grid gap-3 py-3 sm:grid-cols-[minmax(0,170px)_minmax(0,1fr)] sm:items-center">
+                      <div className="min-w-0">
+                        <p className="text-[12.5px] font-semibold text-brand-900">{label}{(value === 'rc' || value === 'identity') && <span className="text-danger"> *</span>}</p>
+                        {document && <p className="mt-0.5 truncate text-[11px] text-brand-900/70">{document.name} · {fileSize(document.bytes)}</p>}
+                      </div>
+                      <label className="flex min-w-0 cursor-pointer items-center justify-between gap-3 rounded-lg border border-brand-200 bg-white px-3 py-2 text-[12px] text-ink-mute hover:border-brand-400">
+                        <span>{documentUploading === value ? 'Uploading…' : document ? 'Replace file' : 'Choose PDF or image'}</span>
+                        <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only"
+                          onClick={(e) => { e.currentTarget.value = ''; }}
+                          onChange={(e) => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (file) uploadDocument(value, file); }} />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

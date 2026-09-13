@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db, insert, nowIso, uid } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
-import { isOwnStagedKey } from '@/services/storage';
+import { isOwnPrivateUploadKey, isOwnStagedKey } from '@/services/storage';
 import { usedBikeSchema } from '@/lib/validation';
 import { handleError, ok, fail, readJson } from '@/lib/api';
 import { rateLimit } from '@/lib/ratelimit';
@@ -37,6 +37,11 @@ export async function POST(req: NextRequest) {
     for (const image of body.images) {
       if (!isOwnStagedKey(image.image_url, user.id)) {
         return fail('Photos must be uploaded through this form. Please re-upload your photos.', 422);
+      }
+    }
+    for (const document of body.documents) {
+      if (!isOwnPrivateUploadKey(document.file_key, 'used_bike_document', user.id)) {
+        return fail('Documents must be uploaded through this form. Please re-upload them.', 422);
       }
     }
 
@@ -114,6 +119,16 @@ export async function POST(req: NextRequest) {
       await insert('used_bike_images', {
         id: uid('uim'), used_bike_id: id, angle: body.images[i].angle,
         image_url: body.images[i].image_url, approved: 0, sort_order: i,
+      });
+    }
+
+    for (const document of body.documents) {
+      const documentId = await insert('used_bike_documents', {
+        id: uid('udoc'), used_bike_id: id, doc_type: document.doc_type,
+        storage_key: document.file_key, private: 1, status: 'pending',
+      });
+      await audit(user, 'used_bike.upload_document', 'used_bike_document', documentId, {
+        used_bike_id: id, doc_type: document.doc_type,
       });
     }
 

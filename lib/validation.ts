@@ -130,6 +130,10 @@ export const usedBikeSchema = z.object({
         });
       }
     }),
+  documents: z.array(z.object({
+    doc_type: z.enum(['rc', 'insurance', 'identity', 'loan_noc', 'service_history', 'other']),
+    file_key: z.string().min(1),
+  })).max(6).default([]),
 });
 
 export const reviewSchema = z.object({
