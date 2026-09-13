@@ -44,25 +44,50 @@ let provider: EmailProvider = httpProvider;
 export function registerEmailProvider(p: EmailProvider) { provider = p; }
 
 /**
- * SMTP provider (nodemailer) — used when SMTP_HOST + SMTP_USER + SMTP_PASS
- * are configured. For Outlook/Hotmail: SMTP_HOST=smtp-mail.outlook.com,
- * SMTP_PORT=587, SMTP_USER=you@outlook.com, SMTP_PASS=<app password>.
- * Takes priority over the generic HTTP provider when configured.
+ * SMTP provider (nodemailer). Outlook.com now requires OAuth2/XOAUTH2 for
+ * SMTP AUTH; password/app-password auth is retained only as a compatibility
+ * fallback for SMTP providers that still permit it.
  */
+function smtpOAuthValues() {
+  return [process.env.SMTP_CLIENT_ID, process.env.SMTP_CLIENT_SECRET, process.env.SMTP_REFRESH_TOKEN];
+}
+
+function smtpOAuthConfigured() {
+  return smtpOAuthValues().every(Boolean);
+}
+
+function smtpAuthConfigured() {
+  const oauthValues = smtpOAuthValues();
+  // Do not silently fall back to a password when an OAuth setup is partially
+  // present; that would produce a misleading AUTH LOGIN failure.
+  if (oauthValues.some(Boolean)) return oauthValues.every(Boolean);
+  return Boolean(process.env.SMTP_PASS);
+}
+
 const smtpProvider: EmailProvider = {
   name: 'smtp',
-  configured: () =>
-    Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+  configured: () => Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && smtpAuthConfigured()),
   async send(msg) {
     if (!this.configured()) return { delivered: false, provider: 'smtp', reason: 'not_configured' };
     const port = Number(process.env.SMTP_PORT || 587);
+    const useOAuth = smtpOAuthConfigured();
     try {
       const nodemailer = require('nodemailer');
       const transport = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port,
         secure: port === 465,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        requireTLS: port === 587,
+        auth: useOAuth
+          ? {
+              type: 'OAuth2',
+              user: process.env.SMTP_USER,
+              clientId: process.env.SMTP_CLIENT_ID,
+              clientSecret: process.env.SMTP_CLIENT_SECRET,
+              refreshToken: process.env.SMTP_REFRESH_TOKEN,
+              accessUrl: process.env.SMTP_OAUTH_ACCESS_URL || 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+            }
+          : { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
       });
       const info = await transport.sendMail({
         from: process.env.MAIL_FROM || process.env.SMTP_USER,
@@ -79,6 +104,7 @@ const smtpProvider: EmailProvider = {
       console.error('[email] SMTP delivery failed', {
         host: process.env.SMTP_HOST,
         port,
+        authMode: useOAuth ? 'oauth2' : 'password',
         code: error.code,
         responseCode: error.responseCode,
         command: error.command,
