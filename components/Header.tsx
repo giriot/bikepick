@@ -15,8 +15,6 @@ const NAV = [
   { href: '/compare', label: 'Compare' },
   { href: '/used-bikes', label: 'Used Bikes' },
   { href: '/dealer-offers', label: 'Dealer Offers' },
-  { href: '/reviews', label: 'Reviews' },
-  { href: '/guides', label: 'Guides' },
 ];
 
 export function Header({ user }: { user: AppUser | null }) {

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 const TYPES = [
+  ['visiting_card', 'Visiting card'],
   ['gst_certificate', 'GST certificate'],
   ['trade_licence', 'Trade licence'],
   ['address_proof', 'Address proof'],

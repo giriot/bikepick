@@ -7,7 +7,7 @@ const COLUMNS = [
     links: [
       ['New bikes', '/bikes'], ['Electric scooters & bikes', '/electric'],
       ['Compare', '/compare'], ['Used bikes', '/used-bikes'],
-      ['Dealer offers', '/dealer-offers'], ['Reviews', '/reviews'], ['Buying guides', '/guides'],
+      ['Dealer offers', '/dealer-offers'],
     ],
   },
   {

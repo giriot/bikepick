@@ -7,7 +7,7 @@ import { audit } from '@/lib/audit';
 import { isOwnPrivateUploadKey } from '@/services/storage';
 
 const schema = z.object({
-  doc_type: z.enum(['gst_certificate', 'trade_licence', 'address_proof', 'pan_card', 'dealership_letter', 'other']),
+  doc_type: z.enum(['visiting_card', 'gst_certificate', 'trade_licence', 'address_proof', 'pan_card', 'dealership_letter', 'other']),
   file_key: z.string().min(1),
   note: z.string().max(300).optional().or(z.literal('')),
 });

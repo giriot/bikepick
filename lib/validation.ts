@@ -69,6 +69,8 @@ export const dealerRegisterSchema = z.object({
   pincode: pincodeSchema,
   brands: z.array(z.string()).default([]),
   about: z.string().trim().max(1000).optional().or(z.literal('')),
+  visiting_card_key: z.string().trim().min(1, 'Upload the visiting card for dealership confirmation'),
+  confirm_details: z.literal('on', { errorMap: () => ({ message: 'Confirm that the dealership details and visiting card are accurate' }) }),
 });
 
 export const offerSchema = z.object({
