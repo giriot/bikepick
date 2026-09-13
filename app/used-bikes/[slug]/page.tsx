@@ -82,6 +82,7 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
   ];
 
   const verdictTone = bike.price_verdict === 'good_deal' ? 'success' : bike.price_verdict === 'high_price' ? 'warn' : 'info';
+  const loginHref = `/login?next=${encodeURIComponent(`/used-bikes/${bike.slug}`)}`;
 
   return (
     <div className="container-xl py-6">
@@ -186,7 +187,7 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
             <SaveButton usedBikeId={bike.id} initialSaved={isSaved} className="btn-outline w-full justify-center" />
           </div>
           <div className="mt-3">
-            <SellerPhoneReveal usedBikeId={bike.id} />
+            <SellerPhoneReveal usedBikeId={bike.id} loggedIn={!!user} loginHref={loginHref} />
           </div>
 
           {dealer && (
