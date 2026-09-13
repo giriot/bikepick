@@ -216,11 +216,11 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
                   >
                     {passed ? (
                       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                        <path d="m3 8.5 3.1 3.1L13 4.8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="m3 8.5 3.1 3.1L13 4.8" stroke="#00875C" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     ) : (
                       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                        <path d="m4.2 4.2 7.6 7.6M11.8 4.2l-7.6 7.6" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
+                        <path d="m4.2 4.2 7.6 7.6M11.8 4.2l-7.6 7.6" stroke="#E11D48" strokeWidth="2.3" strokeLinecap="round" />
                       </svg>
                     )}
                   </span>
@@ -230,6 +230,14 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
           </div>
         </div>
       </section>
+
+      <div className="mt-4 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[12.5px] leading-5 text-ink-soft">
+        <strong className="text-ink">Before you buy:</strong> Physically inspect and test-ride the vehicle. Match the
+        chassis and engine numbers with the original RC, review the seller’s original documents, insurance, loan/NOC and
+        service records, and consider an inspection by a trusted mechanic. Bikepick.IN verification is limited to the
+        checks shown above; it is not a mechanical warranty or a guarantee of condition. Never pay an advance before
+        verifying the bike and seller.
+      </div>
 
       <AdSlot slotKey="used_list_inline" className="mt-8" />
 
