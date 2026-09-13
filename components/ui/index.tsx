@@ -33,7 +33,8 @@ export function SectionHeader({ title, subtitle, action }: { title: string; subt
 export function ScoreRing({ score, size = 80, showValue = true }: { score: number; size?: number; showValue?: boolean }) {
   const r = (size - 10) / 2;
   const c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(100, score));
+  const safeScore = Number.isFinite(score) ? score : 0;
+  const pct = Math.max(0, Math.min(100, safeScore));
   const colour = pct >= 75 ? '#00B27A' : pct >= 55 ? '#F0620C' : '#F59E0B';
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={`Bikepick Score ${score} out of 100`}>

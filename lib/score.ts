@@ -37,6 +37,15 @@ const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
 const scale = (v: number, lo: number, hi: number) => clamp(((v - lo) / (hi - lo)) * 100);
 
 export function computeScore(input: ScoreInput, weights: ScoreWeights = DEFAULT_WEIGHTS): ScoreResult {
+  // Defensive: admin data may be the legacy vite-app shape ({price,efficiency,ownership}) or
+  // partially corrupted JSON. Merge with defaults so a bad stored value never makes the
+  // score NaN and invisible.
+  const w: ScoreWeights = { ...DEFAULT_WEIGHTS, ...(weights || {}) } as ScoreWeights;
+  // Coerce any non-finite weights back to defaults (e.g. legacy keys carrying NaN).
+  for (const k of Object.keys(DEFAULT_WEIGHTS) as (keyof ScoreWeights)[]) {
+    const v = (w as any)[k];
+    if (!Number.isFinite(v)) (w as any)[k] = DEFAULT_WEIGHTS[k];
+  }
   const { bike, ev, price } = input;
   const isEv = (input.fuelType || '').toLowerCase() === 'electric';
   const pillars: PillarScore[] = [];
@@ -52,7 +61,7 @@ export function computeScore(input: ScoreInput, weights: ScoreWeights = DEFAULT_
       s = clamp(s * 0.7 + scale(bhpPerLakh, 3, 20) * 0.3);
     }
     pillars.push({
-      key: 'value', label: 'Value for money', score: Math.round(s), weight: weights.value,
+      key: 'value', label: 'Value for money', score: Math.round(s), weight: w.value,
       reason: `Priced ${ratio >= 1 ? 'below' : 'above'} the segment median with ${power ? `${power.toFixed(1)} bhp-equivalent` : 'limited'} output per rupee.`,
     });
   }
@@ -80,7 +89,7 @@ export function computeScore(input: ScoreInput, weights: ScoreWeights = DEFAULT_
     pillars.push({
       key: 'features', label: 'Features & technology',
       score: Math.round(clamp((present.length / known.length) * 100)),
-      weight: weights.features,
+      weight: w.features,
       reason: `${present.length} of ${known.length} tracked features present${present.length ? `: ${present.slice(0, 4).map(([k]) => k).join(', ')}` : ''}.`,
     });
   }
@@ -101,7 +110,7 @@ export function computeScore(input: ScoreInput, weights: ScoreWeights = DEFAULT_
       s = scale(ptw, 40, 220) * 0.5 + scale(bike?.max_torque_nm || 0, 8, 45) * 0.25 + scale(bike?.top_speed_kmph || 0, 70, 200) * 0.25;
       reason = `${bike?.max_power_bhp ?? '—'} bhp and ${bike?.max_torque_nm ?? '—'} Nm at ${kg} kg (${ptw.toFixed(0)} bhp/tonne).`;
     }
-    pillars.push({ key: 'performance', label: 'Performance', score: Math.round(clamp(s)), weight: weights.performance, reason });
+    pillars.push({ key: 'performance', label: 'Performance', score: Math.round(clamp(s)), weight: w.performance, reason });
   }
 
   /* -------------------------------- Safety -------------------------------- */
@@ -118,7 +127,7 @@ export function computeScore(input: ScoreInput, weights: ScoreWeights = DEFAULT_
     if (/disc/i.test(bike?.rear_brake || '')) { s += 6; notes.push('rear disc'); }
     if (bike?.drl === 1) { s += 3; notes.push('DRL'); }
     if (bike?.hill_hold === 1) { s += 3; notes.push('hill hold'); }
-    pillars.push({ key: 'safety', label: 'Safety', score: Math.round(clamp(s)), weight: weights.safety, reason: `Equipped with ${notes.join(', ')}.` });
+    pillars.push({ key: 'safety', label: 'Safety', score: Math.round(clamp(s)), weight: w.safety, reason: `Equipped with ${notes.join(', ')}.` });
   }
 
   /* ----------------------------- Running cost ----------------------------- */
@@ -136,7 +145,7 @@ export function computeScore(input: ScoreInput, weights: ScoreWeights = DEFAULT_
       s = clamp(100 - scale(costPerKm, 1.2, 5));
       reason = `About ₹${costPerKm.toFixed(2)}/km at ${bike?.mileage_kmpl} kmpl and ₹104.5/L.`;
     }
-    pillars.push({ key: 'running_cost', label: 'Running cost', score: Math.round(s), weight: weights.running_cost, reason });
+    pillars.push({ key: 'running_cost', label: 'Running cost', score: Math.round(s), weight: w.running_cost, reason });
   }
 
   /* -------------------------------- Comfort -------------------------------- */
@@ -152,7 +161,7 @@ export function computeScore(input: ScoreInput, weights: ScoreWeights = DEFAULT_
     if (/monoshock|gas|mono/i.test(bike?.suspension_rear || '')) { s += 10; notes.push('monoshock rear'); }
     if (/telescopic|usd|upside/i.test(bike?.suspension_front || '')) { s += 6; }
     if (bike?.kerb_weight_kg && bike.kerb_weight_kg < 150) { s += 6; notes.push('light kerb weight'); }
-    pillars.push({ key: 'comfort', label: 'Comfort & ergonomics', score: Math.round(clamp(s)), weight: weights.comfort, reason: notes.join(', ') || 'Based on recorded ergonomics.' });
+    pillars.push({ key: 'comfort', label: 'Comfort & ergonomics', score: Math.round(clamp(s)), weight: w.comfort, reason: notes.join(', ') || 'Based on recorded ergonomics.' });
   }
 
   /* ------------------------------ Maintenance ------------------------------ */
@@ -167,16 +176,18 @@ export function computeScore(input: ScoreInput, weights: ScoreWeights = DEFAULT_
       notes.push('fewer wear items than petrol');
     }
     if (bike?.warranty) notes.push(`warranty ${bike.warranty}`);
-    pillars.push({ key: 'maintenance', label: 'Maintenance', score: Math.round(clamp(s)), weight: weights.maintenance, reason: notes.join(', ') });
+    pillars.push({ key: 'maintenance', label: 'Maintenance', score: Math.round(clamp(s)), weight: w.maintenance, reason: notes.join(', ') });
   }
 
-  const totalWeight = pillars.reduce((a, p) => a + p.weight, 0);
-  const allWeight = Object.values(weights).reduce((a, b) => a + b, 0);
-  const total = totalWeight
-    ? Math.round(pillars.reduce((a, p) => a + p.score * p.weight, 0) / totalWeight)
+  const totalWeight = pillars.reduce((a, p) => a + (Number.isFinite(p.weight) ? p.weight : 0), 0);
+  const allWeight = Object.values(w).reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
+  const rawTotal = totalWeight
+    ? pillars.reduce((a, p) => a + p.score * p.weight, 0) / totalWeight
     : 0;
+  const total = Number.isFinite(rawTotal) ? Math.round(rawTotal) : 0;
+  const coverage = allWeight ? Math.round((totalWeight / allWeight) * 100) : 0;
 
-  return { total, pillars, coverage: Math.round((totalWeight / allWeight) * 100) };
+  return { total: Number.isFinite(total) ? total : 0, pillars, coverage: Number.isFinite(coverage) ? coverage : 0 };
 }
 
 /** Human explanation of why a product leads a comparison. */

@@ -56,6 +56,35 @@ function initializeSqliteRuntime(raw: any) {
     raw.prepare('INSERT INTO schema_migrations (id, name, applied_at) VALUES (?,?,?)').run(uid('mig'), migration.name, new Date().toISOString());
   }
 
+  // Self-heal a legacy vite-app default that was stored under the same key but
+  // with completely different pillar names (price/efficiency/ownership). That
+  // legacy value makes computeScore produce NaN and the score becomes invisible
+  // on every product page and card. Fix it even on an existing dev database
+  // where roles are already present (the old code returned early and never ran
+  // the repair).
+  const CORRECT_SCORE = '{"value":20,"features":15,"performance":15,"safety":15,"running_cost":15,"comfort":10,"maintenance":10}';
+  try {
+    const row: any = raw.prepare("SELECT value FROM settings WHERE key = 'score_weights'").get();
+    if (row && row.value) {
+      let needsFix = false;
+      try {
+        const parsed = JSON.parse(row.value);
+        // Legacy has keys like price/efficiency/ownership and lacks value/running_cost/maintenance
+        if (parsed && typeof parsed === 'object') {
+          const hasLegacy = 'price' in parsed || 'efficiency' in parsed || 'ownership' in parsed;
+          const lacksNew = !('value' in parsed) || !('running_cost' in parsed) || !('maintenance' in parsed);
+          if (hasLegacy && lacksNew) needsFix = true;
+        }
+      } catch {
+        // Non-JSON stored value also needs fix
+        needsFix = true;
+      }
+      if (needsFix) {
+        raw.prepare("UPDATE settings SET value = ?, updated_at = ? WHERE key = 'score_weights'").run(CORRECT_SCORE, new Date().toISOString());
+      }
+    }
+  } catch {}
+
   const roleCount = Number(raw.prepare('SELECT COUNT(*) AS c FROM roles').get().c || 0);
   if (roleCount > 0) return;
 
@@ -77,7 +106,7 @@ function initializeSqliteRuntime(raw: any) {
   }
 
   insertIgnore('settings', { id: 'set_brand_color', key: 'brand_color', value: '#F0620C', value_type: 'string', group_name: 'brand', label: 'Brand colour', help_text: null, created_at: now, updated_at: now });
-  insertIgnore('settings', { id: 'set_score_weights', key: 'score_weights', value: '{"price":20,"performance":20,"efficiency":20,"safety":15,"features":10,"comfort":10,"ownership":5}', value_type: 'json', group_name: 'score', label: 'Score weights', help_text: null, created_at: now, updated_at: now });
+  insertIgnore('settings', { id: 'set_score_weights', key: 'score_weights', value: CORRECT_SCORE, value_type: 'json', group_name: 'score', label: 'Score weights', help_text: null, created_at: now, updated_at: now });
   insertIgnore('settings', { id: 'set_category_chooser', key: 'show_category_chooser', value: '0', value_type: 'boolean', group_name: 'ui', label: 'Show category chooser', help_text: null, created_at: now, updated_at: now });
 }
 
@@ -159,6 +188,10 @@ const PG_RUNTIME_MIGRATIONS: { name: string; sql: string }[] = [
   {
     name: 'rt_real_world_mileage',
     sql: 'ALTER TABLE bike_specs ADD COLUMN IF NOT EXISTS real_world_mileage_kmpl REAL',
+  },
+  {
+    name: 'rt_fix_score_weights',
+    sql: `UPDATE settings SET value = '{"value":20,"features":15,"performance":15,"safety":15,"running_cost":15,"comfort":10,"maintenance":10}', updated_at = NOW()::text WHERE key = 'score_weights' AND (value LIKE '%\"price\"%' OR value LIKE '%\"efficiency\"%' OR value LIKE '%\"ownership\"%') AND value NOT LIKE '%\"running_cost\"%'`,
   },
 ];
 
