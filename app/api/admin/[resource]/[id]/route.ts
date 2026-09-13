@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/rbac';
 import { normalisePayload, updateRow, deleteRow } from '@/lib/admin-write';
 import { handleError, ok, fail, readJson } from '@/lib/api';
 import { audit } from '@/lib/audit';
+import { promoteUsedBikeImages } from '@/lib/media-staging';
 
 export async function PATCH(req: NextRequest, { params }: { params: { resource: string; id: string } }) {
   try {
@@ -35,6 +36,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { resource: 
     }
 
     await updateRow(resource, params.id, data);
+
+    // Publishing via the edit form (status flipped to approved) promotes the
+    // staged photos too — same rule as the Approve action.
+    if (resource.key === 'used-bikes' && data.status === 'approved' && String(existing.status) !== 'approved') {
+      await promoteUsedBikeImages(params.id);
+    }
+
     await audit(user, `${resource.key}.update`, resource.table, params.id, changed);
     return ok({ id: params.id, changed: Object.keys(changed) }, 'Saved');
   } catch (e) {

@@ -21,8 +21,11 @@ const STEPS = ['Vehicle', 'Condition', 'Paperwork', 'Photos', 'Price & submit'] 
 
 /** An uploaded photo: where it lives, and what it actually weighs on disk
  *  after the server's automatic compression (sizes come from the upload
- *  response; dimensions are null when the file was stored as uploaded). */
+ *  response; dimensions are null when the file was stored as uploaded).
+ *  `key` is the staged storage key submitted with the listing; `url` is only
+ *  a short-lived private preview — photos stay private until approval. */
 interface Photo {
+  key: string;
   url: string;
   bytes: number;
   originalBytes: number;
@@ -105,10 +108,11 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
     const json = await res.json();
     setUploading(null);
     const d = json.data || {};
-    if (json.ok && d.url) {
+    if (json.ok && d.url && d.key) {
       setPhotos((p) => ({
         ...p,
         [angle]: {
+          key: d.key,
           url: d.url,
           bytes: Number(d.bytes) || file.size,
           originalBytes: Number(d.original_bytes) || file.size,
@@ -132,7 +136,9 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
         registration_year: f.registration_year ? Number(f.registration_year) : undefined,
         km_driven: Number(f.km_driven), owners: Number(f.owners), asking_price: Number(f.asking_price),
         abs_equipped: f.abs_equipped === 'yes',
-        images: Object.entries(photos).map(([angle, photo]) => ({ angle, image_url: photo.url })),
+        // Submit the staged storage key, not the preview URL — the server
+        // verifies ownership and publishes the photo only on approval.
+        images: Object.entries(photos).map(([angle, photo]) => ({ angle, image_url: photo.key })),
       }),
     });
     const json = await res.json();

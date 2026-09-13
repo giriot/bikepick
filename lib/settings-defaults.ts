@@ -47,6 +47,7 @@ export const DEFAULT_SETTINGS: Record<string, { value: string; type: string; gro
   offer_auto_expiry_days: { value: '30', type: 'number', group: 'dealers', label: 'Auto-expire dealer offers after (days)', help: 'Applies when a dealer does not set an end date.' },
   dealer_auto_approve_offers: { value: '0', type: 'bool', group: 'dealers', label: 'Auto-approve offers from verified dealers' },
   used_bike_listing_expiry_days: { value: '60', type: 'number', group: 'verification', label: 'Auto-expire used listings after (days)' },
+  staging_ttl_hours: { value: '24', type: 'number', group: 'verification', label: 'Sweep abandoned staged photos after (hours)', help: 'Staged photos not attached to a live listing are deleted after this long. Set to 0 to disable the sweep.' },
   maintenance_mode: { value: '0', type: 'bool', group: 'general', label: 'Maintenance mode (public site read-only notice)' },
   seo_default_title: { value: 'Bikepick.IN — Compare Smart. Buy Better.', type: 'string', group: 'seo', label: 'Default SEO title' },
   seo_default_description: {

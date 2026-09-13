@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db, insert, nowIso, uid } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
+import { isOwnStagedKey } from '@/services/storage';
 import { usedBikeSchema } from '@/lib/validation';
 import { handleError, ok, fail, readJson } from '@/lib/api';
 import { rateLimit } from '@/lib/ratelimit';
@@ -24,6 +25,16 @@ export async function POST(req: NextRequest) {
     const body = usedBikeSchema.parse(await readJson(req));
     const minPhotos = Number((await getSetting('used_bike_min_photos')) || 5);
     if (body.images.length < minPhotos) return fail(`At least ${minPhotos} photos are required`, 422);
+
+    // Photos must be objects the seller just uploaded through this form —
+    // staged under their own id in `private-docs`. This rejects arbitrary
+    // URLs and other users' uploads. They stay private and unreadable until
+    // a verifier approves the listing (see lib/media-staging.ts).
+    for (const image of body.images) {
+      if (!isOwnStagedKey(image.image_url, user.id)) {
+        return fail('Photos must be uploaded through this form. Please re-upload your photos.', 422);
+      }
+    }
 
     // Match to a catalogue product where possible (helps search and valuation).
     let productId = body.product_id && body.product_id !== 'other' ? body.product_id : null;
@@ -87,6 +98,8 @@ export async function POST(req: NextRequest) {
     });
 
     for (let i = 0; i < body.images.length; i++) {
+      // image_url holds the staged key (private-docs/staging/…); it is
+      // rewritten to a public URL and approved=1 only on approval.
       await insert('used_bike_images', {
         id: uid('uim'), used_bike_id: id, angle: body.images[i].angle,
         image_url: body.images[i].image_url, approved: 0, sort_order: i,
