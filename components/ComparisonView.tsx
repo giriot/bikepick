@@ -60,7 +60,12 @@ export function ComparisonView({ entities, picker, ids, title, crumbs, weights =
               <p className="mt-1 text-[15px] font-bold">{inr(entity.price)}</p>
               <p className="text-[10.5px] text-ink-mute">ex-showroom</p>
               <div className="mt-2 flex justify-center"><ScoreRing score={result.total} size={62} /></div>
-              {winner.entity.id === entity.id && <span className="badge mt-2 bg-accent-soft text-accent-dark">Highest score</span>}
+              <p className="mt-1 text-[13px] font-bold leading-none tracking-tight">
+                {result.total}
+                <span className="text-[11px] font-medium text-ink-mute">/100</span>
+              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mute">Bikepick Score</p>
+              {winner.entity.id === entity.id && <span className="badge mt-1.5 bg-accent-soft text-accent-dark">Highest score</span>}
             </div>
           ))}
         </div>

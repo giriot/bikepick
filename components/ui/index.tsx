@@ -44,8 +44,8 @@ export function ScoreRing({ score, size = 80, showValue = true }: { score: numbe
       </svg>
       {showValue && (
         <div className="absolute inset-0 grid place-items-center overflow-hidden">
-          <span className="flex items-baseline gap-px whitespace-nowrap">
-            <span className="text-[17px] font-bold leading-none">{score}</span>
+          <span className="flex items-baseline gap-px whitespace-nowrap text-ink">
+            <span className="text-[17px] font-bold leading-none text-ink">{safeScore}</span>
             <span className="text-[8px] font-medium text-ink-mute">/100</span>
           </span>
         </div>
