@@ -7,6 +7,7 @@ import { handleError, ok, fail, readJson } from '@/lib/api';
 import { audit } from '@/lib/audit';
 import { notify, type NotificationEvent } from '@/lib/notify';
 import { recomputeTrust } from '@/lib/trust-service';
+import { promoteUsedBikeImages } from '@/lib/media-staging';
 
 /**
  * Executes a declared workflow transition: writes the status columns, stores the
@@ -50,6 +51,12 @@ export async function POST(req: NextRequest, { params }: { params: { resource: s
 
     // Approving a used listing recomputes its trust score from the current checks.
     if (resource.key === 'used-bikes') await recomputeTrust(params.id);
+
+    // Publishing a used listing promotes its staged photos into public-media
+    // and marks them approved — before this moment they are private.
+    if (resource.key === 'used-bikes' && set.status === 'approved') {
+      await promoteUsedBikeImages(params.id);
+    }
 
     if (action.notify && resource.ownerColumn && row[resource.ownerColumn]) {
       const owner = await db.get<any>('SELECT email, phone FROM users WHERE id = ?', [row[resource.ownerColumn]]);

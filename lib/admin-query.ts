@@ -1,6 +1,7 @@
 import 'server-only';
 import { db } from './db';
 import type { AdminResource } from './admin-config';
+import { storage, isStagingKey } from '@/services/storage';
 
 export interface ListResult {
   rows: any[];
@@ -69,7 +70,27 @@ export async function listResource(
   ]);
 
   const total = count?.c ?? 0;
-  return { rows, total, page, pages: Math.max(1, Math.ceil(total / PER_PAGE)) };
+  return { rows: await withViewableStagedUrls(rows), total, page, pages: Math.max(1, Math.ceil(total / PER_PAGE)) };
+}
+
+/**
+ * Staged (pre-approval) photo keys are not publicly readable. For admin list
+ * views we swap them for a short-lived viewable URL (signed URL on Supabase,
+ * owner/staff-only preview route locally) so reviewers can actually open the
+ * photo. Raw values are kept when signing is unavailable. Only list rows are
+ * rewritten — edit forms and PATCH diffs keep the stable staged key.
+ */
+async function withViewableStagedUrls(rows: any[]): Promise<any[]> {
+  let store: ReturnType<typeof storage> | null = null;
+  for (const row of rows) {
+    for (const [column, value] of Object.entries(row)) {
+      if (!isStagingKey(value as any)) continue;
+      store = store || storage();
+      const signed = await store.getSignedUrl('private-docs', value as string, 3600).catch(() => null);
+      if (signed) row[column] = signed;
+    }
+  }
+  return rows;
 }
 
 export async function getRow(resource: AdminResource, id: string) {
