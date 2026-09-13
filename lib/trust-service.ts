@@ -39,9 +39,11 @@ export async function getUsedBikeApprovalReadiness(
     db.all<any>('SELECT id, angle FROM used_bike_images WHERE used_bike_id = ?', [usedBikeId]),
   ]);
 
+  // These identity and ownership checks are required for publication.
+  // Insurance, loan/NOC status and service history remain optional evidence:
+  // when present they improve the trust score, but they do not block publishing.
   const requiredChecks = [
     'seller_identity', 'ownership_declaration', 'rc_verification',
-    'insurance_verification', 'loan_status', 'service_history',
   ];
   const missingChecks = requiredChecks.filter((type) => !checks.some((check) => check.check_type === type && check.result === 'passed'));
   const requiredDocuments = ['identity', 'rc', 'insurance'];

@@ -14,6 +14,8 @@ type CheckRow = {
 const RESULT_OPTIONS = ['not_checked', 'passed', 'failed', 'unavailable'] as const;
 const METHOD_OPTIONS = ['', 'document_review', 'phone_call', 'physical_visit', 'third_party', 'other'] as const;
 
+const OPTIONAL_FOR_PUBLISH = new Set(['insurance_verification', 'loan_status', 'service_history']);
+
 const LABELS: Record<string, string> = {
   seller_identity: 'Seller identity',
   ownership_declaration: 'Ownership declaration',
@@ -69,7 +71,11 @@ export function UsedBikeChecks({ initial }: { initial: CheckRow[] }) {
           <div key={row.id} className="grid gap-3 rounded-xl border border-line bg-surface p-3.5 lg:grid-cols-[minmax(160px,0.8fr)_150px_170px_minmax(0,1fr)_auto] lg:items-end">
             <div className="min-w-0">
               <p className="truncate text-[13px] font-semibold">{title(row.check_type)}</p>
-              <p className="mt-0.5 text-[11px] text-ink-mute">Only “passed” contributes to the trust score.</p>
+              <p className="mt-0.5 text-[11px] text-ink-mute">
+                {OPTIONAL_FOR_PUBLISH.has(row.check_type)
+                  ? 'Optional for publishing · a passed result improves the trust score.'
+                  : 'Required for publishing · only “passed” contributes to the trust score.'}
+              </p>
             </div>
             <div>
               <label className="label" htmlFor={`check-result-${row.id}`}>Result</label>

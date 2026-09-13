@@ -115,7 +115,7 @@ export async function UsedBikeReviewPanel({ usedBikeId }: { usedBikeId: string }
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h2 className="text-[14px] font-semibold">Verification checklist</h2>
-            <p className="mt-0.5 text-[12px] text-ink-mute">Complete the checks before using “Approve &amp; publish”.</p>
+            <p className="mt-0.5 text-[12px] text-ink-mute">Seller identity, ownership, RC verification and all seven photos are required for publishing. Insurance, loan/NOC status and service history are optional evidence that improves the trust score.</p>
           </div>
           <span className="rounded-full bg-surface px-2.5 py-1 text-[11px] font-medium text-ink-mute">
             {checks.filter((check) => check.result === 'passed').length}/{checks.length} passed
