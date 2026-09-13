@@ -1,16 +1,16 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { db, nowIso } from '@/lib/db';
+import { db, insert, nowIso, uid } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { emailSchema } from '@/lib/validation';
-import { verifyDealerEmailOtp } from '@/lib/email-otp';
+import { verifyDealerEmailOtp, verifyDealerEmailOtpForRegistration } from '@/lib/email-otp';
 import { handleError, ok, fail, readJson } from '@/lib/api';
 import { rateLimit } from '@/lib/ratelimit';
 import { audit } from '@/lib/audit';
 import { notify } from '@/lib/notify';
 
 const schema = z.object({
-  dealer_id: z.string().min(1),
+  dealer_id: z.string().min(1).optional(),
   email: emailSchema,
   code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit verification code'),
 });
@@ -21,6 +21,22 @@ export async function POST(req: NextRequest) {
     const body = schema.parse(await readJson(req));
     const limited = await rateLimit('dealer_verify_email_otp', { limit: 8, windowSeconds: 600, key: user.id });
     if (!limited.ok) return fail(`Too many attempts. Try again in ${limited.retryAfter}s.`, 429);
+
+    if (!body.dealer_id) {
+      const result = await verifyDealerEmailOtpForRegistration(body.email, body.code);
+      if (!result.ok) return fail(result.error, 422, { code: result.error });
+
+      await db.run(
+        "DELETE FROM verification_records WHERE entity_type = 'dealer_registration_email' AND entity_id = ? AND check_type = 'business_email'",
+        [user.id],
+      );
+      await insert('verification_records', {
+        id: uid('ver'), entity_type: 'dealer_registration_email', entity_id: user.id,
+        check_type: 'business_email', result: 'passed', method: 'email_otp',
+        evidence_note: body.email, performed_by: user.id, performed_at: nowIso(),
+      });
+      return ok({ verified: true, email: body.email }, 'Dealer email confirmed. You can submit the application.');
+    }
 
     const dealer = await db.get<any>(
       'SELECT id, email, email_verified FROM dealer_profiles WHERE id = ? AND user_id = ? AND deleted_at IS NULL',

@@ -59,8 +59,8 @@ export function SearchBox({
         onSubmit={(e) => { e.preventDefault(); submit(); }}
         className={`relative flex items-center gap-2 rounded-2xl border border-line bg-white ${size === 'lg' ? 'px-4 py-3 shadow-card' : 'px-3 py-2'} focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100`}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"
-          className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-ink-soft ${size === 'lg' ? 'left-4' : 'left-3'}`} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+          className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-[#e30917] ${size === 'lg' ? 'left-4' : 'left-3'}`} stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
           <circle cx="11" cy="11" r="7.5" />
           <path d="m20.5 20.5-3.9-3.9" />
         </svg>
@@ -78,7 +78,7 @@ export function SearchBox({
           aria-controls="search-suggestions"
           aria-activedescendant={open && active >= 0 ? `search-suggestion-${active}` : undefined}
           aria-autocomplete="list"
-          className={`w-full appearance-none bg-transparent outline-none ${size === 'lg' ? 'pl-9 text-[15px]' : 'pl-7 text-sm'} placeholder:text-ink-mute`}
+          className={`min-w-0 flex-1 appearance-none bg-transparent outline-none ${size === 'lg' ? 'pl-10 text-[15px]' : 'pl-8 text-sm'} placeholder:text-ink-mute`}
         />
         {loading && <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-line border-t-brand-500" aria-hidden="true" />}
         <button type="submit" className={`btn-primary shrink-0 ${size === 'lg' ? '' : 'btn-sm'}`}>Search</button>

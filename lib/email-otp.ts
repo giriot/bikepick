@@ -63,7 +63,7 @@ export function sendDealerEmailOtp(email: string): Promise<DeliveryResult> {
   return sendOtp(email, DEALER_EMAIL_OTP_PURPOSE, 'Confirm your Bikepick.IN dealer email', 'Bikepick.IN dealer email');
 }
 
-async function verifyOtpCode(email: string, code: string, purpose: string): Promise<OtpResult> {
+async function verifyOtpCode(email: string, code: string, purpose: string, successState = 1): Promise<OtpResult> {
   const destination = email.trim().toLowerCase();
   const row = await db.get<any>(
     `SELECT * FROM otp_codes
@@ -86,7 +86,7 @@ async function verifyOtpCode(email: string, code: string, purpose: string): Prom
     return { ok: false, error: 'The verification code is incorrect.' };
   }
 
-  await db.run('UPDATE otp_codes SET consumed = 1, updated_at = ? WHERE id = ?', [nowIso(), row.id]);
+  await db.run('UPDATE otp_codes SET consumed = ?, updated_at = ? WHERE id = ?', [successState, nowIso(), row.id]);
   return { ok: true };
 }
 
@@ -104,4 +104,10 @@ export async function verifyEmailOtp(email: string, code: string): Promise<{ ok:
 
 export async function verifyDealerEmailOtp(email: string, code: string): Promise<OtpResult> {
   return verifyOtpCode(email, code, DEALER_EMAIL_OTP_PURPOSE);
+}
+
+/** Verifies the dealer email before an application is submitted. State 2 is a
+ * single-use proof consumed by the registration route. */
+export async function verifyDealerEmailOtpForRegistration(email: string, code: string): Promise<OtpResult> {
+  return verifyOtpCode(email, code, DEALER_EMAIL_OTP_PURPOSE, 2);
 }

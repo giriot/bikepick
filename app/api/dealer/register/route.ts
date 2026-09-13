@@ -1,11 +1,10 @@
 import { NextRequest } from 'next/server';
-import { db, insert, uid } from '@/lib/db';
+import { db, insert, nowIso, uid } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { dealerRegisterSchema } from '@/lib/validation';
 import { handleError, ok, fail, readJson } from '@/lib/api';
 import { rateLimit } from '@/lib/ratelimit';
 import { audit } from '@/lib/audit';
-import { emailVerificationConfigured, sendDealerEmailOtp } from '@/lib/email-otp';
 import { isOwnPrivateUploadKey } from '@/services/storage';
 
 /** Dealer applications always start as `pending` — an admin must verify them. */
@@ -24,15 +23,15 @@ export async function POST(req: NextRequest) {
         visiting_card_key: 'Upload a valid visiting card for dealership confirmation',
       });
     }
-    if (!emailVerificationConfigured()) {
-      return fail('Dealer email verification is not configured yet. Please try again shortly.', 503);
+    const emailProof = await db.get<any>(
+      "SELECT id FROM verification_records WHERE entity_type = 'dealer_registration_email' AND entity_id = ? AND check_type = 'business_email' AND result = 'passed' AND evidence_note = ? ORDER BY created_at DESC LIMIT 1",
+      [user.id, body.email],
+    );
+    if (!emailProof) {
+      return fail('Verify the dealer email with the OTP before submitting the application.', 422, {
+        email: 'Verify this email address first',
+      });
     }
-    const otpLimited = await rateLimit('dealer_email_otp', { limit: 3, windowSeconds: 600, key: body.email });
-    if (!otpLimited.ok) return fail(`Too many verification emails. Try again in ${otpLimited.retryAfter}s.`, 429);
-    const delivery = await sendDealerEmailOtp(body.email);
-    if (!delivery.delivered) return fail('Could not send the dealer confirmation email. Please try again shortly.', 503, {
-      email: 'Confirmation email could not be sent',
-    });
 
     const id = uid('dlr');
     await db.tx(async () => {
@@ -43,7 +42,7 @@ export async function POST(req: NextRequest) {
         gstin: body.gstin || null, address: body.address, city: body.city,
         state: body.state, pincode: body.pincode,
         brands: JSON.stringify(body.brands || []), about: body.about || null,
-        status: 'pending', email_verified: 0,
+        status: 'pending', email_verified: 1,
       });
       await insert('dealer_documents', {
         id: uid('doc'), dealer_id: id, doc_type: 'visiting_card',
@@ -52,11 +51,10 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    await db.run('UPDATE verification_records SET result = \'consumed\', updated_at = ? WHERE id = ?', [nowIso(), emailProof.id]);
+    await db.run("UPDATE otp_codes SET consumed = 1, updated_at = ? WHERE destination = ? AND purpose = 'dealer_register_email' AND consumed = 2", [nowIso(), body.email]);
     await audit(user, 'dealer.apply', 'dealer_profile', id);
-    return ok(
-      { id, status: 'pending', email: body.email, needs_email_verification: true },
-      'Application saved. We sent a verification code to the dealer email.',
-    );
+    return ok({ id, status: 'pending', email: body.email, email_verified: true }, 'Application submitted for verification');
   } catch (e) {
     return handleError(e);
   }

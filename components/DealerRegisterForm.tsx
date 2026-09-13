@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { DealerEmailVerification } from './DealerEmailVerification';
 
 const MAX_VISITING_CARD_BYTES = 4 * 1024 * 1024;
 
@@ -25,8 +24,13 @@ export function DealerRegisterForm({ brands, defaults }: {
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string[]>([]);
+  const [businessEmail, setBusinessEmail] = useState(defaults.email);
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailOtpCode, setEmailOtpCode] = useState('');
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailOtpBusy, setEmailOtpBusy] = useState(false);
+  const [emailOtpNotice, setEmailOtpNotice] = useState<string | null>(null);
   const [visitingCardName, setVisitingCardName] = useState('');
-  const [dealerVerification, setDealerVerification] = useState<{ id: string; email: string } | null>(null);
 
   const fieldClass = (name: string) => fields[name]
     ? 'field !border-rose-400 !bg-rose-50/40 focus:!border-rose-500'
@@ -42,11 +46,87 @@ export function DealerRegisterForm({ brands, defaults }: {
     ? <p className="mt-1 text-[12px] leading-4 text-rose-700" role="alert">{fields[name]}</p>
     : null;
 
+  function changeBusinessEmail(value: string) {
+    setBusinessEmail(value);
+    setEmailOtpSent(false);
+    setEmailOtpCode('');
+    setEmailVerified(false);
+    setEmailOtpNotice(null);
+    setFields((previous) => {
+      const next = { ...previous };
+      delete next.email;
+      return next;
+    });
+  }
+
+  async function sendBusinessEmailOtp() {
+    const email = businessEmail.trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      setFields((previous) => ({ ...previous, email: 'Enter a valid business email first' }));
+      return;
+    }
+    setEmailOtpBusy(true); setError(null); setEmailOtpNotice(null);
+    try {
+      const res = await fetch('/api/dealer/send-email-otp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ email }),
+      });
+      const json = await responseJson(res);
+      if (!res.ok || !json.ok) {
+        setError(json.error || 'Could not send the email code');
+        return;
+      }
+      setBusinessEmail(email);
+      setEmailOtpSent(true);
+      setEmailOtpCode('');
+      setEmailOtpNotice(json.message || 'A 6-digit code was sent to this email.');
+    } catch {
+      setError('Could not reach the email service. Check your connection and try again.');
+    } finally {
+      setEmailOtpBusy(false);
+    }
+  }
+
+  async function verifyBusinessEmailOtp() {
+    if (emailOtpCode.length !== 6) return;
+    setEmailOtpBusy(true); setError(null); setEmailOtpNotice(null);
+    try {
+      const res = await fetch('/api/dealer/verify-email', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ email: businessEmail.trim().toLowerCase(), code: emailOtpCode }),
+      });
+      const json = await responseJson(res);
+      if (!res.ok || !json.ok) {
+        setError(json.error || 'Could not verify the email code');
+        return;
+      }
+      setEmailVerified(true);
+      setEmailOtpNotice(json.message || 'Business email verified. You can submit the application.');
+    } catch {
+      setError('Could not reach the verification service. Check your connection and try again.');
+    } finally {
+      setEmailOtpBusy(false);
+    }
+  }
+
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     setFields({});
+
+    if (!emailVerified) {
+      setError('Verify the business email with the OTP before submitting.');
+      setFields({ email: 'Verify this email address first.' });
+      setBusy(false);
+      return;
+    }
 
     const fd = new FormData(e.currentTarget);
     const visitingCard = fd.get('visiting_card');
@@ -99,12 +179,6 @@ export function DealerRegisterForm({ brands, defaults }: {
         return;
       }
 
-      if (json.data?.needs_email_verification && json.data?.id && json.data?.email) {
-        setDealerVerification({ id: json.data.id, email: json.data.email });
-        setBusy(false);
-        return;
-      }
-
       router.push('/dealer');
       router.refresh();
     } catch (err) {
@@ -114,10 +188,6 @@ export function DealerRegisterForm({ brands, defaults }: {
       setError(message);
       setBusy(false);
     }
-  }
-
-  if (dealerVerification) {
-    return <DealerEmailVerification dealerId={dealerVerification.id} email={dealerVerification.email} />;
   }
 
   return (
@@ -136,10 +206,29 @@ export function DealerRegisterForm({ brands, defaults }: {
             <input id="phone" name="phone" required inputMode="numeric" defaultValue={defaults.phone} className={fieldClass('phone')} placeholder="10-digit mobile" /><Err name="phone" /></div>
           <div><Label htmlFor="whatsapp" optional>WhatsApp</Label>
             <input id="whatsapp" name="whatsapp" inputMode="numeric" className={fieldClass('whatsapp')} /><Err name="whatsapp" /></div>
-          <div><Label htmlFor="email">Business email</Label>
-            <input id="email" name="email" type="email" required defaultValue={defaults.email} className={fieldClass('email')} />
-            <p className="mt-1 text-[11.5px] text-ink-mute">A 6-digit OTP will be sent here after you submit the application.</p>
-            <Err name="email" /></div>
+          <div>
+            <Label htmlFor="email">Business email</Label>
+            <div className="flex gap-2">
+              <input id="email" name="email" type="email" required value={businessEmail}
+                onChange={(event) => changeBusinessEmail(event.target.value)} className={`${fieldClass('email')} min-w-0 flex-1`} />
+              <button type="button" onClick={sendBusinessEmailOtp} disabled={emailOtpBusy || emailVerified || !businessEmail.trim()}
+                className="btn-outline btn-sm shrink-0">{emailOtpBusy ? 'Sending…' : emailVerified ? 'Verified' : emailOtpSent ? 'Resend OTP' : 'Get OTP'}</button>
+            </div>
+            <p className="mt-1 text-[11.5px] text-ink-mute">Enter the email, click Get OTP, then verify the 6-digit code before submitting.</p>
+            {emailVerified && <p className="mt-1 text-[12px] font-semibold text-emerald-700">✓ Business email verified</p>}
+            {emailOtpNotice && !emailVerified && <p className="mt-1 text-[12px] text-brand-700" role="status">{emailOtpNotice}</p>}
+            <Err name="email" />
+            {emailOtpSent && !emailVerified && (
+              <div className="mt-2 flex gap-2">
+                <input aria-label="Dealer email OTP" value={emailOtpCode}
+                  onChange={(event) => setEmailOtpCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6-digit OTP"
+                  className="field min-w-0 flex-1" />
+                <button type="button" onClick={verifyBusinessEmailOtp} disabled={emailOtpBusy || emailOtpCode.length !== 6}
+                  className="btn-primary btn-sm shrink-0">{emailOtpBusy ? 'Checking…' : 'Verify OTP'}</button>
+              </div>
+            )}
+          </div>
           <div><Label htmlFor="gstin" optional>GSTIN</Label>
             <input id="gstin" name="gstin" className={fieldClass('gstin')} placeholder="22AAAAA0000A1Z5" /><Err name="gstin" />
             <p className="mt-1 text-[11.5px] text-ink-mute">Speeds up verification considerably.</p></div>
