@@ -64,7 +64,18 @@ const smtpProvider: EmailProvider = {
       });
       return { delivered: true, provider: 'smtp', id: info.messageId };
     } catch (e) {
-      return { delivered: false, provider: 'smtp', reason: (e as Error).message };
+      const error = e as { message?: string; code?: string; responseCode?: number; command?: string };
+      // Keep the client response generic, but leave enough non-secret detail in
+      // Vercel logs to distinguish bad credentials from a blocked SMTP socket.
+      console.error('[email] SMTP delivery failed', {
+        host: process.env.SMTP_HOST,
+        port,
+        code: error.code,
+        responseCode: error.responseCode,
+        command: error.command,
+        message: error.message,
+      });
+      return { delivered: false, provider: 'smtp', reason: error.message || 'smtp_delivery_failed' };
     }
   },
 };
