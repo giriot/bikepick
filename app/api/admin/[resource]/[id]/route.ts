@@ -6,6 +6,8 @@ import { normalisePayload, updateRow, deleteRow } from '@/lib/admin-write';
 import { handleError, ok, fail, readJson } from '@/lib/api';
 import { audit } from '@/lib/audit';
 import { promoteUsedBikeImages } from '@/lib/media-staging';
+import { getUsedBikeApprovalReadiness } from '@/lib/trust-service';
+import { nowIso } from '@/lib/db';
 
 export async function PATCH(req: NextRequest, { params }: { params: { resource: string; id: string } }) {
   try {
@@ -29,6 +31,33 @@ export async function PATCH(req: NextRequest, { params }: { params: { resource: 
       }
     }
 
+    // A verification result must carry the reviewer and timestamp. Keeping
+    // this server-side prevents the browser from manufacturing a completed
+    // check or changing the actor identity.
+    if (resource.key === 'verifications' && 'result' in data) {
+      if (data.result && data.result !== 'not_checked') {
+        data.performed_by = user.id;
+        data.performed_at = data.performed_at || nowIso();
+      } else {
+        data.performed_by = null;
+        data.performed_at = null;
+      }
+    }
+
+    if (resource.key === 'used-bikes' && data.status === 'approved' && String(existing.status) !== 'approved') {
+      data.approved_at = nowIso();
+      data.approved_by = user.id;
+    }
+
+    if (resource.key === 'used-bikes' && data.status === 'approved' && String(existing.status) !== 'approved') {
+      const readiness = await getUsedBikeApprovalReadiness(params.id);
+      if (!readiness.ok) return fail(readiness.message || 'Complete verification before publishing', 422);
+      const promoted = await promoteUsedBikeImages(params.id);
+      if (promoted.missing || promoted.failed) {
+        return fail('Some listing photos could not be prepared for publication. Re-upload them and try again.', 422);
+      }
+    }
+
     // Record only what actually changed, for a meaningful audit trail.
     const changed: Record<string, any> = {};
     for (const [k, v] of Object.entries(data)) {
@@ -36,12 +65,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { resource: 
     }
 
     await updateRow(resource, params.id, data);
-
-    // Publishing via the edit form (status flipped to approved) promotes the
-    // staged photos too — same rule as the Approve action.
-    if (resource.key === 'used-bikes' && data.status === 'approved' && String(existing.status) !== 'approved') {
-      await promoteUsedBikeImages(params.id);
-    }
 
     await audit(user, `${resource.key}.update`, resource.table, params.id, changed);
     return ok({ id: params.id, changed: Object.keys(changed) }, 'Saved');

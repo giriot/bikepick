@@ -4,6 +4,7 @@ import { db, insert, uid } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { handleError, ok, fail, readJson } from '@/lib/api';
 import { audit } from '@/lib/audit';
+import { isOwnPrivateUploadKey } from '@/services/storage';
 
 const schema = z.object({
   doc_type: z.enum(['gst_certificate', 'trade_licence', 'address_proof', 'pan_card', 'dealership_letter', 'other']),
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest) {
     if (!dealer) return fail('No dealer profile', 404);
 
     const b = schema.parse(await readJson(req));
+    if (!isOwnPrivateUploadKey(b.file_key, 'dealer_document', user.id)) {
+      return fail('Please upload the document through this form before attaching it', 422);
+    }
     const id = await insert('dealer_documents', {
       id: uid('doc'), dealer_id: dealer.id, doc_type: b.doc_type,
       storage_key: b.file_key, private: 1, note: b.note || null, status: 'pending',

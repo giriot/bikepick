@@ -40,7 +40,7 @@ export const DEFAULT_SETTINGS: Record<string, { value: string; type: string; gro
   electricity_price_default: { value: '8', type: 'number', group: 'calculators', label: 'Default electricity tariff (₹/unit)' },
   charging_efficiency_default: { value: '85', type: 'number', group: 'calculators', label: 'Default charging efficiency (%)' },
   used_bike_require_inspection: { value: '0', type: 'bool', group: 'verification', label: 'Require inspection before approval' },
-  used_bike_min_photos: { value: '5', type: 'number', group: 'verification', label: 'Minimum photos for a used listing' },
+  used_bike_min_photos: { value: '7', type: 'number', group: 'verification', label: 'Minimum photos for a used listing' },
   lead_price_default: { value: '49', type: 'number', group: 'revenue', label: 'Default dealer lead price (₹)' },
   inspection_fee_default: { value: '999', type: 'number', group: 'revenue', label: 'Used-bike inspection fee (₹)', help: 'Set to 0 to show “Request a quote” instead of a price.' },
   featured_listing_price: { value: '499', type: 'number', group: 'revenue', label: 'Featured used-listing price (₹)' },

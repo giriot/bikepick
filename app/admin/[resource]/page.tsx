@@ -96,18 +96,18 @@ export default async function AdminList({ params, searchParams }: {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full min-w-[760px] text-[13px]">
+          <table className="w-full min-w-[980px] text-[13px]">
             <thead className="bg-surface text-[11px] uppercase tracking-wide text-ink-mute">
               <tr>
-                {resource.columns.map((c) => <th key={c.name} className="px-4 py-2.5 text-left font-semibold">{c.label}</th>)}
-                <th className="px-4 py-2.5 text-right font-semibold">Actions</th>
+                {resource.columns.map((c) => <th key={c.name} className="whitespace-nowrap px-4 py-2.5 text-left font-semibold">{c.label}</th>)}
+                <th className="whitespace-nowrap px-4 py-2.5 text-right font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {rows.map((row) => (
                 <tr key={row.id} className="align-top hover:bg-surface/50">
                   {resource.columns.map((c, i) => (
-                    <td key={c.name} className="px-4 py-3">
+                    <td key={c.name} className="px-4 py-3 align-middle">
                       {i === 0 ? (
                         <Link href={`/admin/${resource.key}/${row.id}`} className="font-medium text-brand-700 hover:underline">
                           {cell(row, c)}
@@ -115,7 +115,7 @@ export default async function AdminList({ params, searchParams }: {
                       ) : cell(row, c)}
                     </td>
                   ))}
-                  <td className="px-4 py-3">
+                  <td className="whitespace-nowrap px-4 py-3 align-middle">
                     <div className="flex justify-end">
                       <RowActions resource={resource.key} id={row.id} row={row}
                         actions={resource.actions || []} canDelete={resource.canDelete} />

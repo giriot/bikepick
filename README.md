@@ -52,7 +52,7 @@ Project → Settings → Environment Variables (add to **Production, Preview, De
 | `NEXT_PUBLIC_SITE_URL` | recommended | `https://bikepick.in` (SEO canonicals) |
 | `SUPABASE_SERVICE_ROLE_KEY` | optional | Only if you enable the Supabase compat layer; **never** `NEXT_PUBLIC_` |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | optional | Compat layer is a safe no-op when unset |
-| `RAZORPAY_KEY_ID/SECRET`, `EMAIL_*`, `SMS_*`, `CRON_SECRET`, `ADSENSE_CLIENT_ID` | optional | Feature toggles; unset = feature off |
+| `RAZORPAY_KEY_ID/SECRET`, `EMAIL_*`, `SMTP_*`, `MAIL_FROM`, `SMS_*`, `CRON_SECRET`, `ADSENSE_CLIENT_ID` | optional | Feature toggles; unset = feature off. SMTP takes priority for email delivery. |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET` | optional | Only for the **legacy** admin console (`/admin` cookie login). The main way to admin is a user account with `role='admin'`. Fails closed when unset. |
 
 ### 3 · Create the first admin

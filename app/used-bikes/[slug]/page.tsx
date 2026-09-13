@@ -95,8 +95,8 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
         </div>
       )}
 
-      <div className="mt-4 grid gap-8 lg:grid-cols-[1.15fr_1fr]">
-        <div>
+      <div className="mt-4 grid items-start gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+        <div className="min-w-0">
           <div className="product-stage aspect-[8/5] border border-line">
             <Image src={images[0]?.image_url || '/media/used.svg'} alt={`${bike.brand_name} ${bike.model_name}`} width={880} height={550} priority className="h-full w-full object-contain" />
             <div className="absolute left-3 top-3 flex gap-1.5">
@@ -120,7 +120,7 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
           </p>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-[-0.035em] sm:text-[32px]">
             {bike.brand_name} {bike.model_name}
             {bike.variant_name ? <span className="text-ink-mute"> {bike.variant_name}</span> : null}

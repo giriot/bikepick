@@ -7,7 +7,7 @@ import { handleError, ok, fail, readJson } from '@/lib/api';
 import { rateLimit } from '@/lib/ratelimit';
 import { slugify, normalizeKey } from '@/lib/slug';
 import { estimateUsedPrice, judgeAskingPrice } from '@/lib/calculators';
-import { computeTrust, DEFAULT_TRUST_WEIGHTS, type TrustWeights } from '@/lib/trust';
+import { computeTrust, DEFAULT_TRUST_WEIGHTS, REQUIRED_ANGLES, type TrustWeights } from '@/lib/trust';
 import { getJsonSetting, getSetting } from '@/lib/settings';
 import { audit, track } from '@/lib/audit';
 import { notify } from '@/lib/notify';
@@ -19,11 +19,14 @@ import { notify } from '@/lib/notify';
 export async function POST(req: NextRequest) {
   try {
     const user = await requireUser();
+    if (!user.full_name || !user.email || !user.phone) {
+      return fail('Complete your name, email and mobile number in Account → Profile before listing a bike', 422);
+    }
     const limited = await rateLimit('used_bike_submit', { limit: 5, windowSeconds: 3600, key: user.id });
     if (!limited.ok) return fail('You have submitted several listings recently. Please try again later.', 429);
 
     const body = usedBikeSchema.parse(await readJson(req));
-    const minPhotos = Number((await getSetting('used_bike_min_photos')) || 5);
+    const minPhotos = Math.max(Number((await getSetting('used_bike_min_photos')) || 5), REQUIRED_ANGLES.length);
     if (body.images.length < minPhotos) return fail(`At least ${minPhotos} photos are required`, 422);
 
     // Photos must be objects the seller just uploaded through this form —
@@ -114,9 +117,9 @@ export async function POST(req: NextRequest) {
     }
 
     await notify({
-      userId: user.id, event: 'verification_result',
-      title: 'Listing received — verification pending',
-      body: 'We will verify your identity and documents before your listing goes public.',
+      userId: user.id, event: 'used_bike_submitted',
+      title: 'Used-bike listing received',
+      body: 'We will verify your identity, documents and photos before your listing goes public.',
       link: '/account/listings', email: user.email, phone: user.phone,
     });
     await audit(user, 'used_bike.submit', 'used_bike', id);

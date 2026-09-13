@@ -6,7 +6,7 @@ import { requirePermission } from '@/lib/rbac';
 import { handleError, ok, fail, readJson } from '@/lib/api';
 import { audit } from '@/lib/audit';
 import { notify, type NotificationEvent } from '@/lib/notify';
-import { recomputeTrust } from '@/lib/trust-service';
+import { getUsedBikeApprovalReadiness, recomputeTrust } from '@/lib/trust-service';
 import { promoteUsedBikeImages } from '@/lib/media-staging';
 
 /**
@@ -41,6 +41,18 @@ export async function POST(req: NextRequest, { params }: { params: { resource: s
     }
     if (action.reasonColumn && cols.has(action.reasonColumn)) set[action.reasonColumn] = body.reason!.trim();
 
+    // A listing is not publishable merely because a reviewer clicked a button.
+    // Check the private documents and verification records first, then promote
+    // the staged photos. Failed promotion leaves the listing unpublished.
+    if (resource.key === 'used-bikes' && set.status === 'approved') {
+      const readiness = await getUsedBikeApprovalReadiness(params.id);
+      if (!readiness.ok) return fail(readiness.message || 'Complete verification before publishing', 422);
+      const promoted = await promoteUsedBikeImages(params.id);
+      if (promoted.missing || promoted.failed) {
+        return fail('Some listing photos could not be prepared for publication. Re-upload them and try again.', 422);
+      }
+    }
+
     const keys = Object.keys(set);
     if (keys.length) {
       await db.run(
@@ -52,12 +64,6 @@ export async function POST(req: NextRequest, { params }: { params: { resource: s
     // Approving a used listing recomputes its trust score from the current checks.
     if (resource.key === 'used-bikes') await recomputeTrust(params.id);
 
-    // Publishing a used listing promotes its staged photos into public-media
-    // and marks them approved — before this moment they are private.
-    if (resource.key === 'used-bikes' && set.status === 'approved') {
-      await promoteUsedBikeImages(params.id);
-    }
-
     if (action.notify && resource.ownerColumn && row[resource.ownerColumn]) {
       const owner = await db.get<any>('SELECT email, phone FROM users WHERE id = ?', [row[resource.ownerColumn]]);
       await notify({
@@ -65,6 +71,9 @@ export async function POST(req: NextRequest, { params }: { params: { resource: s
         event: action.notify.event as NotificationEvent,
         title: action.notify.title,
         body: body.reason?.trim() || action.notify.body,
+        link: resource.key === 'used-bikes'
+          ? (set.status === 'approved' ? `/used-bikes/${row.slug}` : '/account/listings')
+          : undefined,
         email: owner?.email, phone: owner?.phone,
       });
     }

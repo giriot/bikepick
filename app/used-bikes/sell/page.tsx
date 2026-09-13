@@ -4,6 +4,7 @@ import { getSetting } from '@/lib/settings';
 import { SellWizard } from '@/components/SellWizard';
 import { Breadcrumbs, SectionHeader } from '@/components/ui';
 import { buildMetadata, breadcrumbJsonLd, JsonLd } from '@/lib/seo';
+import { REQUIRED_ANGLES } from '@/lib/trust';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,8 +67,8 @@ export default async function SellPage() {
         <SellWizard
           signedIn={!!user}
           brands={brands}
-          minPhotos={Number(minPhotos || 5)}
-          defaults={{ name: user?.full_name || '', phone: user?.phone || '', city: user?.city || '' }}
+          minPhotos={Math.max(Number(minPhotos || 5), REQUIRED_ANGLES.length)}
+          defaults={{ name: user?.full_name || '', email: user?.email || '', phone: user?.phone || '', city: user?.city || '' }}
         />
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { REQUIRED_ANGLES } from './trust';
 
 /**
  * Indian mobile number. People type spaces, dashes and +91 — we strip all of
@@ -114,7 +115,18 @@ export const usedBikeSchema = z.object({
   description: z.string().trim().max(2000).optional().or(z.literal('')),
   images: z
     .array(z.object({ angle: z.string(), image_url: z.string().min(1) }))
-    .default([]),
+    .default([])
+    .superRefine((images, ctx) => {
+      const angles = new Set(images.map((image) => image.angle));
+      const missing = REQUIRED_ANGLES.filter((angle) => !angles.has(angle));
+      if (missing.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Upload the required photos: ${missing.join(', ')}`,
+          path: [],
+        });
+      }
+    }),
 });
 
 export const reviewSchema = z.object({

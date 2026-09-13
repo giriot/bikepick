@@ -8,7 +8,7 @@ interface Props {
   signedIn: boolean;
   brands: { name: string; models: { id: string; name: string; price: number | null }[] }[];
   minPhotos: number;
-  defaults: { name: string; phone: string; city: string };
+  defaults: { name: string; email: string; phone: string; city: string };
 }
 
 const REQUIRED_ANGLES = [
@@ -65,9 +65,14 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
       if (!f.manufacture_year) return 'Enter the manufacture year';
       if (!f.km_driven) return 'Enter kilometres driven';
       if (!f.city) return 'Enter your city';
+      if (!defaults.phone) return 'Add your mobile number in Account → Profile before listing your bike';
       return null;
     }
-    if (i === 3 && Object.keys(photos).length < minPhotos) return `Upload at least ${minPhotos} photos`;
+    if (i === 3) {
+      const missingAngles = REQUIRED_ANGLES.filter(([angle]) => !photos[angle]).map(([, label]) => label);
+      if (missingAngles.length) return `Add the required photo angles: ${missingAngles.join(', ')}`;
+      if (Object.keys(photos).length < minPhotos) return `Upload at least ${minPhotos} photos`;
+    }
     if (i === 4 && (!f.asking_price || Number(f.asking_price) < 1000)) return 'Enter a realistic asking price';
     return null;
   };
@@ -172,8 +177,9 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
         <h2 className="mt-4 text-xl font-semibold">Listing submitted for verification</h2>
         <p className="mx-auto mt-2 max-w-lg text-[13.5px] leading-6 text-ink-mute">
           Status: <strong className="text-ink">{done.status.replace(/_/g, ' ')}</strong>. Our team will verify your
-          identity and documents before the listing becomes public. You will be notified of the outcome — including if we
-          need more information.
+          identity and documents before the listing becomes public. Use “Track my listing” to upload your RC, insurance and
+          identity documents if you have not already done so. You will be notified of the outcome — including if we need
+          more information.
         </p>
         <div className="mt-5 flex justify-center gap-2">
           <Link href="/account/listings" className="btn-primary">Track my listing</Link>
@@ -186,9 +192,9 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
   return (
     <div>
       {/* Stepper */}
-      <ol className="mb-6 flex flex-wrap gap-2" aria-label="Progress">
+      <ol className="mb-6 grid gap-2 sm:grid-cols-5" aria-label="Progress">
         {STEPS.map((s, i) => (
-          <li key={s} className="flex items-center gap-2">
+          <li key={s} className="flex min-w-0 items-center gap-2 rounded-xl border border-line bg-surface px-2.5 py-2 sm:border-0 sm:bg-transparent sm:p-0">
             <span className={`grid h-7 w-7 place-items-center rounded-full text-[12px] font-bold ${i < step ? 'bg-accent text-white' : i === step ? 'bg-brand-500 text-white' : 'bg-surface text-ink-mute'}`} aria-current={i === step ? 'step' : undefined}>
               {i < step ? '✓' : i + 1}
             </span>
@@ -242,6 +248,30 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
             <Field label="City" required><input value={f.city} onChange={(e) => set('city', e.target.value)} className="field" /></Field>
             <Field label="State"><input value={f.state} onChange={(e) => set('state', e.target.value)} className="field" /></Field>
             <Field label="Pincode"><input value={f.pincode} onChange={(e) => set('pincode', e.target.value)} inputMode="numeric" className="field" /></Field>
+
+            <div className="sm:col-span-2 rounded-xl border border-brand-200 bg-brand-50 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[13.5px] font-semibold text-brand-900">Owner details</p>
+                  <p className="mt-0.5 text-[12px] leading-5 text-brand-800/80">
+                    Buyers never see your private contact details. We use them to verify ownership and send listing updates.
+                  </p>
+                </div>
+                <Link href="/account/profile" className="btn-outline btn-sm bg-white">Update profile</Link>
+              </div>
+              <dl className="mt-3 grid gap-2 sm:grid-cols-3">
+                {[
+                  ['Name', defaults.name || 'Add your name'],
+                  ['Email', defaults.email || 'Missing'],
+                  ['Mobile', defaults.phone || 'Add a mobile number'],
+                ].map(([label, value]) => (
+                  <div key={label} className="min-w-0 rounded-lg border border-brand-200 bg-white px-3 py-2">
+                    <dt className="text-[10.5px] uppercase tracking-wide text-ink-mute">{label}</dt>
+                    <dd className="mt-0.5 truncate text-[12.5px] font-semibold text-ink" title={value}>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           </div>
         )}
 
@@ -328,8 +358,8 @@ export function SellWizard({ signedIn, brands, minPhotos, defaults }: Props) {
         {step === 3 && (
           <div>
             <p className="mb-4 text-[13px] text-ink-mute">
-              Upload at least {minPhotos} clear daylight photos. Blurred, cropped or stock images are rejected during review.
-              Required angles: {uploadedRequired}/{REQUIRED_ANGLES.length} uploaded.
+              Upload at least {minPhotos} clear daylight photos. All {REQUIRED_ANGLES.length} marked angles are required;
+              blurred, cropped or stock images are rejected during review. Required angles: {uploadedRequired}/{REQUIRED_ANGLES.length} uploaded.
             </p>
             <div className="grid gap-3 sm:grid-cols-3">
               {[...REQUIRED_ANGLES, ...OPTIONAL_ANGLES].map(([angle, label]) => (

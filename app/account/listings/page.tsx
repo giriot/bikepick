@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { inr, relative } from '@/lib/format';
 import { Empty, Notice, TrustBadge } from '@/components/ui';
+import { UsedBikeDocumentUpload } from '@/components/UsedBikeDocumentUpload';
 import { buildMetadata } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,13 @@ export default async function MyListings() {
        FROM used_bikes u WHERE u.seller_id = ? AND u.deleted_at IS NULL ORDER BY u.created_at DESC`,
     [user.id],
   );
+  const documents = new Map<string, any[]>();
+  await Promise.all(rows.map(async (listing) => {
+    documents.set(listing.id, await db.all<any>(
+      'SELECT id, doc_type, status, note, created_at FROM used_bike_documents WHERE used_bike_id = ? ORDER BY created_at DESC',
+      [listing.id],
+    ));
+  }));
 
   return (
     <div className="space-y-4">
@@ -45,8 +53,8 @@ export default async function MyListings() {
           const s = STATUS_COPY[l.status] || STATUS_COPY.draft;
           return (
             <article key={l.id} className="card p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-[15px] font-semibold">{l.brand_name} {l.model_name} {l.variant_name || ''}</h3>
                     <span className={`badge ${s.tone}`}>{String(l.status).replace(/_/g, ' ')}</span>
@@ -66,6 +74,10 @@ export default async function MyListings() {
               {l.rejection_reason || l.info_request && (
                 <div className="mt-2"><Notice tone={l.status === 'rejected' ? 'danger' : 'warn'} title="Note from our team">{l.rejection_reason || l.info_request}</Notice></div>
               )}
+
+              <div className="mt-5 border-t border-line pt-5">
+                <UsedBikeDocumentUpload listingId={l.id} documents={documents.get(l.id) || []} />
+              </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link href={`/used-bikes/${l.slug}`} className="btn-outline btn-sm">View listing</Link>

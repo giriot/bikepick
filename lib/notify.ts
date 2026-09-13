@@ -5,7 +5,7 @@ import { emailService } from '@/services/email';
 import { smsService } from '@/services/sms';
 
 export type NotificationEvent =
-  | 'price_drop' | 'used_bike_approved' | 'used_bike_rejected' | 'used_bike_info_required'
+  | 'price_drop' | 'used_bike_submitted' | 'used_bike_approved' | 'used_bike_rejected' | 'used_bike_info_required'
   | 'dealer_response' | 'dealer_verified' | 'dealer_rejected' | 'offer_expiring'
   | 'offer_approved' | 'new_matching_bike' | 'verification_result' | 'new_lead'
   | 'review_published' | 'payment_received';
@@ -19,6 +19,13 @@ export interface NotifyInput {
   email?: string | null;
   phone?: string | null;
 }
+
+// A seller must be told when their listing enters or leaves the review queue;
+// these lifecycle emails do not depend on the optional marketing notification
+// toggle. Delivery still requires SMTP or the configured HTTP email provider.
+const USED_BIKE_LIFECYCLE_EMAILS = new Set<NotificationEvent>([
+  'used_bike_submitted', 'used_bike_approved', 'used_bike_rejected', 'used_bike_info_required',
+]);
 
 /**
  * Fan-out to in-app (always), email and SMS/WhatsApp (only when the admin has
@@ -39,7 +46,8 @@ export async function notify(input: NotifyInput): Promise<void> {
     delivery_status: 'delivered',
   });
 
-  if (isOn(settings.notifications_email_enabled) && input.email) {
+  const lifecycleEmail = USED_BIKE_LIFECYCLE_EMAILS.has(input.event);
+  if ((isOn(settings.notifications_email_enabled) || lifecycleEmail) && input.email) {
     const res = await emailService.send({
       to: input.email,
       subject: input.title,
@@ -85,7 +93,7 @@ export async function notify(input: NotifyInput): Promise<void> {
       // Fallback until SMTP is configured: forward through FormSubmit (free,
       // zero keys). Fire-and-forget — never blocks or fails the request.
       try {
-        await fetch('https://formsubmit.co/ajax/bikepick@outlook.com', {
+        await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(owner)}`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', accept: 'application/json' },
           body: JSON.stringify({

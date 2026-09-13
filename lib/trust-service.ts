@@ -1,6 +1,6 @@
 import 'server-only';
 import { db, nowIso } from './db';
-import { computeTrust, DEFAULT_TRUST_WEIGHTS, type TrustWeights } from './trust';
+import { computeTrust, DEFAULT_TRUST_WEIGHTS, REQUIRED_ANGLES, type TrustWeights } from './trust';
 import { getJsonSetting } from './settings';
 
 /**
@@ -8,6 +8,57 @@ import { getJsonSetting } from './settings';
  * declared information that exist right now. Called whenever a verification
  * record changes or a listing moves through the workflow.
  */
+export interface ApprovalReadiness {
+  ok: boolean;
+  message?: string;
+  missingChecks: string[];
+  missingDocuments: string[];
+}
+
+/**
+ * Publishing is a deliberate workflow transition, not just a status dropdown.
+ * Keep the gate small and explicit: the seller must have supplied the core
+ * documents and a verifier must have recorded every required check as passed.
+ */
+export async function getUsedBikeApprovalReadiness(usedBikeId: string): Promise<ApprovalReadiness> {
+  const bike = await db.get<any>('SELECT loan_status FROM used_bikes WHERE id = ?', [usedBikeId]);
+  if (!bike) return { ok: false, message: 'Listing not found', missingChecks: [], missingDocuments: [] };
+
+  const [checks, documents, images] = await Promise.all([
+    db.all<any>("SELECT check_type, result FROM verification_records WHERE entity_type='used_bike' AND entity_id = ?", [usedBikeId]),
+    db.all<any>('SELECT doc_type, status FROM used_bike_documents WHERE used_bike_id = ?', [usedBikeId]),
+    db.all<any>('SELECT id, angle FROM used_bike_images WHERE used_bike_id = ?', [usedBikeId]),
+  ]);
+
+  const requiredChecks = [
+    'seller_identity', 'ownership_declaration', 'rc_verification',
+    'insurance_verification', 'loan_status', 'service_history',
+  ];
+  const missingChecks = requiredChecks.filter((type) => !checks.some((check) => check.check_type === type && check.result === 'passed'));
+  const requiredDocuments = ['identity', 'rc', 'insurance'];
+  if (bike.loan_status === 'loan_closed_noc') requiredDocuments.push('loan_noc');
+  const missingDocuments = requiredDocuments.filter((type) => !documents.some((document) => document.doc_type === type && document.status === 'approved'));
+
+  const missingAngles = REQUIRED_ANGLES.filter((angle) => !images.some((image) => image.angle === angle));
+  if (missingAngles.length) {
+    missingChecks.push(`required photos: ${missingAngles.join(', ')}`);
+  }
+
+  if (missingChecks.length || missingDocuments.length) {
+    const parts: string[] = [];
+    if (missingDocuments.length) parts.push(`approved documents: ${missingDocuments.join(', ')}`);
+    if (missingChecks.length) parts.push(`passed checks: ${missingChecks.join(', ')}`);
+    return {
+      ok: false,
+      message: `Cannot publish yet. Complete ${parts.join('; ')}.`,
+      missingChecks,
+      missingDocuments,
+    };
+  }
+
+  return { ok: true, missingChecks: [], missingDocuments: [] };
+}
+
 export async function recomputeTrust(usedBikeId: string) {
   const bike = await db.get<any>('SELECT * FROM used_bikes WHERE id = ?', [usedBikeId]);
   if (!bike) return null;

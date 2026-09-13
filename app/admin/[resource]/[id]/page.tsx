@@ -11,6 +11,7 @@ import { ResourceForm } from '@/components/admin/ResourceForm';
 import { RowActions } from '@/components/admin/RowActions';
 import { ProductImagesPanel } from '@/components/admin/ProductImagesPanel';
 import { BrandLogoPanel } from '@/components/admin/BrandLogoPanel';
+import { UsedBikeReviewPanel } from '@/components/admin/UsedBikeReviewPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -123,6 +124,10 @@ export default async function AdminEdit({ params }: { params: { resource: string
               </div>
             </div>
           )}
+          {resource.key === 'used-bikes' && !isNew && (
+            <UsedBikeReviewPanel usedBikeId={params.id} />
+          )}
+
           {resource.fields.length === 0 ? (
             <div className="rounded-xl border border-line bg-white p-5">
               <p className="text-[13px] text-ink-mute">This record is read-only by design.</p>

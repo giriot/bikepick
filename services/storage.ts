@@ -63,6 +63,21 @@ export function isOwnStagedKey(key: string | null | undefined, userId: string): 
   return isStagingKey(key) && key.slice(STAGING_PREFIX.length).split('/')[1] === userId;
 }
 
+/**
+ * True when a non-staged upload belongs to the user and was created for the
+ * expected purpose. Upload keys are never accepted from the browser without
+ * checking this prefix: otherwise a seller could attach another user's private
+ * document to their listing.
+ */
+export function isOwnPrivateUploadKey(
+  key: string | null | undefined,
+  purpose: string,
+  userId: string,
+): boolean {
+  if (typeof key !== 'string' || !key || key.includes('..') || key.startsWith(STAGING_PREFIX)) return false;
+  return key.startsWith(`${purpose}/${userId}/`);
+}
+
 /** Guess a content type from a stored key's extension (images we accept). */
 export function contentTypeFromKey(key: string): string {
   const ext = key.split('.').pop()?.toLowerCase();
