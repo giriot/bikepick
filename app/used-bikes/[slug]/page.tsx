@@ -243,20 +243,29 @@ export default async function UsedBikePage({ params }: { params: { slug: string 
         )}
 
         <div className="card mt-4 p-3 sm:p-4">
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-2" role="list" aria-label="Verification status">
             {['seller_identity', 'ownership_declaration', 'rc_verification', 'insurance_verification', 'puc_verification', 'loan_status', 'service_history', 'physical_inspection'].map((type) => {
               const rec = checks.find((c: any) => c.check_type === type);
               const passed = rec?.result === 'passed';
               const status = rec ? titleCase(rec.result) : 'Not checked';
+              const label = titleCase(type);
               return (
-                <div key={type} className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2">
-                  <span className="text-[12.5px] font-medium">{titleCase(type)}</span>
+                <div key={type} className="flex min-h-9 items-center justify-between gap-2 bg-white px-3 py-1.5" role="listitem">
+                  <span className="text-[12px] font-medium leading-4">{label}</span>
                   <span
-                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold ${passed ? 'bg-accent-soft text-accent-dark' : 'bg-danger-soft text-danger'}`}
+                    className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${passed ? 'bg-accent-soft text-accent-dark' : 'bg-danger-soft text-danger'}`}
                     title={status}
-                    aria-label={`${titleCase(type)}: ${status}`}
+                    aria-label={`${label}: ${status}`}
                   >
-                    {passed ? '✓' : '×'}
+                    {passed ? (
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <path d="m3 8.5 3.1 3.1L13 4.8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : (
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <path d="m4.2 4.2 7.6 7.6M11.8 4.2l-7.6 7.6" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
+                      </svg>
+                    )}
                   </span>
                 </div>
               );

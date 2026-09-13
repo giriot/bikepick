@@ -65,7 +65,7 @@ export function UsedBikeDocuments({ initial }: { initial: DocumentRow[] }) {
           <article key={row.id} className="min-w-0 rounded-xl border border-line bg-surface p-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="truncate text-[13px] font-semibold">{labelFor(row.doc_type)}</h3>
+                <h3 className="break-words text-[13px] font-semibold leading-5" title={labelFor(row.doc_type)}>{labelFor(row.doc_type)}</h3>
                 {row.note && <p className="mt-1 break-words text-[11.5px] leading-4 text-ink-mute">{row.note}</p>}
               </div>
               {row.href ? (

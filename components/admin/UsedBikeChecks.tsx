@@ -70,7 +70,7 @@ export function UsedBikeChecks({ initial }: { initial: CheckRow[] }) {
         {rows.map((row) => (
           <div key={row.id} className="grid gap-3 rounded-xl border border-line bg-surface p-3.5 lg:grid-cols-[minmax(160px,0.8fr)_150px_170px_minmax(0,1fr)_auto] lg:items-end">
             <div className="min-w-0">
-              <p className="truncate text-[13px] font-semibold">{title(row.check_type)}</p>
+              <p className="break-words text-[13px] font-semibold leading-5" title={title(row.check_type)}>{title(row.check_type)}</p>
               <p className="mt-0.5 text-[11px] text-ink-mute">
                 {OPTIONAL_FOR_PUBLISH.has(row.check_type)
                   ? 'Optional for publishing · a passed result improves the trust score.'
